@@ -14,6 +14,8 @@ import {
   S3Client,
   ListObjectsV2Command,
   GetObjectCommand,
+  PutObjectCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -21,6 +23,9 @@ import {
   RecordingItem,
   EgressState,
   StartRecordingInput,
+  RequestRecordingUploadInput,
+  RecordingUploadDetails,
+  ConfirmRecordingUploadInput,
 } from './recording.dto';
 import { PrismaService } from '../prisma.service';
 
@@ -429,9 +434,79 @@ export class RecordingService {
     };
   }
 
-  /**
-   * Génère une URL optimisée pour le streaming audio
-   */
+  async requestRecordingUpload(
+    input: RequestRecordingUploadInput,
+    currentUser: { id: number; role: string },
+  ): Promise<RecordingUploadDetails> {
+    const { roomName, immeubleId, mimeType = 'audio/mp4' } = input;
+
+    await this.ensureRoomAccess(roomName, currentUser.id, currentUser.role);
+
+    const safe = this.safeRoom(roomName);
+    const ts = new Date().toISOString().replace(/[:]/g, '-');
+
+    let addressPart = '';
+    if (immeubleId) {
+      const immeuble = await this.prisma.immeuble.findUnique({
+        where: { id: immeubleId },
+        select: { adresse: true },
+      });
+      if (immeuble?.adresse) {
+        addressPart = immeuble.adresse.replace(/[^a-z0-9]/gi, '_') + '_';
+      }
+    }
+
+    const ext = mimeType === 'audio/mp4' ? 'mp4' : 'm4a';
+    const s3Key = `${this.prefix}${safe}/${addressPart}${ts}.${ext}`;
+
+    const expiresIn = 900;
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: s3Key,
+      ContentType: mimeType,
+    });
+
+    const uploadUrl = await getSignedUrl(this.s3, command, { expiresIn });
+
+    this.logger.log(
+      `Upload URL generated: key=${s3Key} room=${roomName} user=${currentUser.role}-${currentUser.id}`,
+    );
+
+    return { uploadUrl, s3Key, expiresIn };
+  }
+
+  async confirmRecordingUpload(
+    input: ConfirmRecordingUploadInput,
+    currentUser: { id: number; role: string },
+  ): Promise<RecordingItem> {
+    const { s3Key, duration } = input;
+
+    const roomName = this.extractRoomFromKey(s3Key);
+    if (roomName) {
+      await this.ensureRoomAccess(roomName, currentUser.id, currentUser.role);
+    } else if (currentUser.role !== 'admin') {
+      throw new ForbiddenException('Unknown recording key');
+    }
+
+    const head = await this.s3.send(
+      new HeadObjectCommand({ Bucket: this.bucket, Key: s3Key }),
+    );
+
+    this.logger.log(
+      `Upload confirmed: key=${s3Key} size=${head.ContentLength} user=${currentUser.role}-${currentUser.id} duration=${duration ?? 'unknown'}`,
+    );
+
+    const url = await this.signedUrlOrUndefined(s3Key);
+
+    return {
+      key: s3Key,
+      size: head.ContentLength,
+      lastModified: head.LastModified,
+      url,
+    };
+  }
+
   async getStreamingUrl(
     key: string,
     currentUser: { id: number; role: string },

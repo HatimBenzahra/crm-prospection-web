@@ -120,6 +120,11 @@ input ConfirmMappingInput {
   mappings: [MappingEntry!]!
 }
 
+input ConfirmRecordingUploadInput {
+  duration: Float
+  s3Key: String!
+}
+
 type ContratValideType {
   commercialId: Int
   commercialWinleadPlusId: String!
@@ -407,6 +412,7 @@ type Mutation {
   batchUpdateOffrePoints(input: BatchUpdateOffrePointsInput!): MappingResult!
   computeRanking(input: ComputeRankingInput!): MappingResult!
   confirmMapping(input: ConfirmMappingInput!): MappingResult!
+  confirmRecordingUpload(input: ConfirmRecordingUploadInput!): RecordingItem!
   createBadgeDefinition(input: CreateBadgeDefinitionInput!): BadgeDefinitionType!
   createCommercial(createCommercialInput: CreateCommercialInput!): Commercial!
   createDirecteur(createDirecteurInput: CreateDirecteurInput!): Directeur!
@@ -439,6 +445,7 @@ type Mutation {
   removePorteFromEtage(etage: Int!, immeubleId: Int!): Immeuble!
   removeStatistic(id: Int!): Statistic!
   removeZone(id: Int!): Zone!
+  requestRecordingUpload(input: RequestRecordingUploadInput!): RecordingUploadDetails!
   revokeBadge(id: Int!): MappingResult!
   seedBadges: SeedBadgesResult!
   startMonitoring(input: StartMonitoringInput!): LiveKitConnectionDetails!
@@ -616,6 +623,12 @@ type RecordingResult {
   url: String
 }
 
+type RecordingUploadDetails {
+  expiresIn: Float!
+  s3Key: String!
+  uploadUrl: String!
+}
+
 input RemoveMappingInput {
   prowinId: Int!
   type: String!
@@ -637,6 +650,15 @@ type ReponseModifierUtilisateur {
 type ReponseSupprimerUtilisateur {
   message: String
   success: Boolean!
+}
+
+input RequestRecordingUploadInput {
+  duration: Float
+  fileSize: Float
+  immeubleId: Float
+  mimeType: String = "audio/mp4"
+  participantIdentity: String
+  roomName: String!
 }
 
 """Rôle de l'utilisateur dans Pro Win"""

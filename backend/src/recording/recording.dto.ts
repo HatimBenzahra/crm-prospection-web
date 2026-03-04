@@ -42,3 +42,38 @@ export class StartRecordingInput {
 export class StopRecordingInput {
   @Field() egressId: string;
 }
+
+@InputType()
+export class RequestRecordingUploadInput {
+  @Field() roomName: string;
+
+  @Field({ nullable: true })
+  immeubleId?: number;
+
+  @Field({ nullable: true })
+  participantIdentity?: string;
+
+  @Field({ nullable: true, defaultValue: 'audio/mp4' })
+  mimeType?: string;
+
+  @Field({ nullable: true })
+  duration?: number;
+
+  @Field({ nullable: true })
+  fileSize?: number;
+}
+
+@ObjectType()
+export class RecordingUploadDetails {
+  @Field() uploadUrl: string;
+  @Field() s3Key: string;
+  @Field() expiresIn: number;
+}
+
+@InputType()
+export class ConfirmRecordingUploadInput {
+  @Field() s3Key: string;
+
+  @Field({ nullable: true })
+  duration?: number;
+}

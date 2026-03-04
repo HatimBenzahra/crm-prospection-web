@@ -6,6 +6,9 @@ import {
   StopRecordingInput,
   RecordingItem,
   EgressState,
+  RequestRecordingUploadInput,
+  RecordingUploadDetails,
+  ConfirmRecordingUploadInput,
 } from './recording.dto';
 import { RecordingService } from './recording.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -61,5 +64,23 @@ export class RecordingResolver {
     @CurrentUser() user: any,
   ): Promise<string> {
     return this.svc.getStreamingUrl(key, user);
+  }
+
+  @Mutation(() => RecordingUploadDetails)
+  @Roles('admin', 'directeur', 'manager', 'commercial')
+  async requestRecordingUpload(
+    @Args('input') input: RequestRecordingUploadInput,
+    @CurrentUser() user: any,
+  ): Promise<RecordingUploadDetails> {
+    return this.svc.requestRecordingUpload(input, user);
+  }
+
+  @Mutation(() => RecordingItem)
+  @Roles('admin', 'directeur', 'manager', 'commercial')
+  async confirmRecordingUpload(
+    @Args('input') input: ConfirmRecordingUploadInput,
+    @CurrentUser() user: any,
+  ): Promise<RecordingItem> {
+    return this.svc.confirmRecordingUpload(input, user);
   }
 }
