@@ -44,6 +44,28 @@ const GET_STREAMING_URL = `
   }
 `
 
+const GET_CONVERSATION_STREAMING_URL = `
+  query GetConversationStreamingUrl($key: String!) {
+    getConversationStreamingUrl(key: $key)
+  }
+`
+
+const TRIGGER_CONVERSATION_EXTRACTION = `
+  mutation TriggerConversationExtraction($key: String!) {
+    triggerConversationExtraction(key: $key)
+  }
+`
+
+const GET_EXTRACTION_PROGRESS = `
+  query GetExtractionProgress($key: String!) {
+    getExtractionProgress(key: $key) {
+      step
+      current
+      total
+    }
+  }
+`
+
 // Service pour la gestion des enregistrements
 export class RecordingService {
   /**
@@ -202,6 +224,29 @@ export class RecordingService {
   /**
    * Télécharge un enregistrement
    */
+  static async getConversationStreamingUrl(key: string): Promise<string | null> {
+    try {
+      const data = await graphqlClient.request(GET_CONVERSATION_STREAMING_URL, { key })
+      return data.getConversationStreamingUrl || null
+    } catch {
+      return null
+    }
+  }
+
+  static async triggerConversationExtraction(key: string): Promise<boolean> {
+    const data = await graphqlClient.request(TRIGGER_CONVERSATION_EXTRACTION, { key })
+    return data.triggerConversationExtraction
+  }
+
+  static async getExtractionProgress(key: string): Promise<{ step: string; current: number; total: number } | null> {
+    try {
+      const data = await graphqlClient.request(GET_EXTRACTION_PROGRESS, { key })
+      return data.getExtractionProgress || null
+    } catch {
+      return null
+    }
+  }
+
   static downloadRecording(url: string, filename?: string): void {
     if (!url) return
 

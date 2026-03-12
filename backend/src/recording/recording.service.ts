@@ -28,6 +28,7 @@ import {
   ConfirmRecordingUploadInput,
 } from './recording.dto';
 import { PrismaService } from '../prisma.service';
+import { TranscriptionService } from '../transcription/transcription.service';
 
 type RoomTarget = {
   type: 'COMMERCIAL' | 'MANAGER';
@@ -70,7 +71,10 @@ export class RecordingService {
 
   private urlCache = new Map<string, { url: string; expiry: number }>();
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private transcription: TranscriptionService,
+  ) {}
 
   private normalizeRoomName(roomName: string): string {
     if (roomName.includes(':')) {
@@ -389,6 +393,7 @@ export class RecordingService {
 
     for (const obj of resp.Contents || []) {
       if (!obj.Key) continue;
+      if (obj.Key.endsWith('_conv.mp4')) continue;
       out.push({
         key: obj.Key,
         size: obj.Size,
@@ -497,6 +502,8 @@ export class RecordingService {
       `Upload confirmed: key=${s3Key} size=${head.ContentLength} user=${currentUser.role}-${currentUser.id} duration=${duration ?? 'unknown'}`,
     );
 
+    void this.transcription.processRecording(s3Key);
+
     const url = await this.signedUrlOrUndefined(s3Key);
 
     return {
@@ -519,7 +526,6 @@ export class RecordingService {
     }
 
     try {
-      // URL avec headers optimisés pour streaming
       const command = new GetObjectCommand({
         Bucket: this.bucket,
         Key: key,
@@ -528,11 +534,82 @@ export class RecordingService {
       });
 
       return await getSignedUrl(this.s3, command, {
-        expiresIn: 7200, // 2h pour streaming
+        expiresIn: 7200,
       });
     } catch (error) {
       this.logger.error(`Erreur génération URL streaming: ${error.message}`);
       throw error;
+    }
+  }
+
+  async triggerConversationExtraction(
+    key: string,
+    currentUser: { id: number; role: string },
+  ): Promise<boolean> {
+    const roomName = this.extractRoomFromKey(key);
+    if (roomName) {
+      await this.ensureRoomAccess(roomName, currentUser.id, currentUser.role);
+    } else if (currentUser.role !== 'admin') {
+      throw new ForbiddenException('Unknown recording key');
+    }
+
+    const convKey = key.replace(/\.mp4$/i, '_conv.mp4');
+
+    try {
+      await this.s3.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: convKey }),
+      );
+      return false;
+    } catch {
+      // Intentionally swallowed — file may not exist yet
+    }
+
+    if (this.transcription.isProcessing(key)) {
+      return false;
+    }
+
+    void this.transcription.processRecording(key);
+    return true;
+  }
+
+  getExtractionProgress(key: string): { step: string; current: number; total: number } | null {
+    return this.transcription.getProgress(key);
+  }
+
+  async getConversationStreamingUrl(
+    key: string,
+    currentUser: { id: number; role: string },
+  ): Promise<string | null> {
+    const roomName = this.extractRoomFromKey(key);
+    if (roomName) {
+      await this.ensureRoomAccess(roomName, currentUser.id, currentUser.role);
+    } else if (currentUser.role !== 'admin') {
+      throw new ForbiddenException('Unknown recording key');
+    }
+
+    const convKey = key.replace(/\.mp4$/i, '_conv.mp4');
+
+    try {
+      await this.s3.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: convKey }),
+      );
+    } catch {
+      return null;
+    }
+
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: convKey,
+        ResponseContentType: 'audio/mp4',
+        ResponseContentDisposition: 'inline',
+      });
+
+      return await getSignedUrl(this.s3, command, {
+        expiresIn: 7200,
+      });
+    } catch {
+      return null;
     }
   }
 }

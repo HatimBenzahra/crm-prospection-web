@@ -9,6 +9,7 @@ import {
   RequestRecordingUploadInput,
   RecordingUploadDetails,
   ConfirmRecordingUploadInput,
+  ExtractionProgressDto,
 } from './recording.dto';
 import { RecordingService } from './recording.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -66,6 +67,15 @@ export class RecordingResolver {
     return this.svc.getStreamingUrl(key, user);
   }
 
+  @Query(() => String, { nullable: true })
+  @Roles('admin', 'directeur')
+  async getConversationStreamingUrl(
+    @Args('key') key: string,
+    @CurrentUser() user: any,
+  ): Promise<string | null> {
+    return this.svc.getConversationStreamingUrl(key, user);
+  }
+
   @Mutation(() => RecordingUploadDetails)
   @Roles('admin', 'directeur', 'manager', 'commercial')
   async requestRecordingUpload(
@@ -82,5 +92,22 @@ export class RecordingResolver {
     @CurrentUser() user: any,
   ): Promise<RecordingItem> {
     return this.svc.confirmRecordingUpload(input, user);
+  }
+
+  @Query(() => ExtractionProgressDto, { nullable: true })
+  @Roles('admin', 'directeur')
+  getExtractionProgress(
+    @Args('key') key: string,
+  ): ExtractionProgressDto | null {
+    return this.svc.getExtractionProgress(key);
+  }
+
+  @Mutation(() => Boolean)
+  @Roles('admin', 'directeur')
+  async triggerConversationExtraction(
+    @Args('key') key: string,
+    @CurrentUser() user: any,
+  ): Promise<boolean> {
+    return this.svc.triggerConversationExtraction(key, user);
   }
 }

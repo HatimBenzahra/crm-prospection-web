@@ -1,4 +1,4 @@
-import { Field, ObjectType, InputType } from '@nestjs/graphql';
+import { Field, ObjectType, InputType, Int } from '@nestjs/graphql';
 
 @ObjectType()
 export class RecordingResult {
@@ -76,4 +76,11 @@ export class ConfirmRecordingUploadInput {
 
   @Field({ nullable: true })
   duration?: number;
+}
+
+@ObjectType()
+export class ExtractionProgressDto {
+  @Field() step: string;
+  @Field(() => Int) current: number;
+  @Field(() => Int) total: number;
 }

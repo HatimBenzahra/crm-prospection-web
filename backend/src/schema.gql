@@ -279,6 +279,12 @@ type EtageInStatistics {
   etage: Int!
 }
 
+type ExtractionProgressDto {
+  current: Int!
+  step: String!
+  total: Int!
+}
+
 type HistoriqueZone {
   assignedAt: DateTime!
   id: Int!
@@ -457,6 +463,7 @@ type Mutation {
   syncContrats: SyncContratsResult!
   syncManagerStats(managerId: Int!): String!
   syncOffres: SyncOffresResult!
+  triggerConversationExtraction(key: String!): Boolean!
   unassignUser(userId: Int!, userType: UserType!): Boolean!
   unassignZoneFromCommercial(commercialId: Int!, zoneId: Int!): Boolean!
   updateBadgeDefinition(id: Int!, input: UpdateBadgeDefinitionInput!): BadgeDefinitionType!
@@ -546,6 +553,8 @@ type Query {
   egressState(egressId: String!): EgressState!
   getActiveRooms: [ActiveRoom!]!
   getActiveSessions: [MonitoringSession!]!
+  getConversationStreamingUrl(key: String!): String
+  getExtractionProgress(key: String!): ExtractionProgressDto
   getStreamingUrl(key: String!): String!
   immeuble(id: Int!): Immeuble!
   immeubles: [Immeuble!]!
