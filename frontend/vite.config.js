@@ -92,7 +92,7 @@ export default defineConfig({
           }
 
           if (id.includes('node_modules')) {
-            return 'vendor-misc'
+            return
           }
         },
         // Optimize chunk file names
