@@ -3,26 +3,9 @@ import { useCommercials, useUpdateCommercial, useManagers, useDirecteurs } from 
 import { useRole } from '@/contexts/userole'
 import { useEntityPermissions, useEntityDescription } from '@/hooks/metier/permissions/useRoleBasedData'
 import { useErrorToast } from '@/hooks/utils/ui/use-error-toast'
-import { calculateRank } from '@/utils/business/ranks'
-import { Badge } from '@/components/ui/badge'
-
-const USER_STATUS_OPTIONS = [
-  {
-    value: 'ACTIF',
-    label: 'Actif',
-    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  },
-  {
-    value: 'CONTRAT_FINIE',
-    label: 'Contrat fini',
-    badgeClass: 'bg-orange-100 text-orange-800 border-orange-200',
-  },
-  {
-    value: 'UTILISATEUR_TEST',
-    label: 'Utilisateur test',
-    badgeClass: 'bg-blue-100 text-blue-800 border-blue-200',
-  },
-]
+import { aggregateStats, calculateRank } from '@/utils/business/ranks'
+import { USER_STATUS_CONFIG, getStatusFilterOptions } from '@/constants/domain/user-status'
+import { useStatusBadge } from '@/hooks/utils/ui/useStatusBadge'
 
 const getCommerciauxColumns = (isAdmin, isDirecteur, renderStatusBadge) => {
   const baseColumns = [
@@ -83,29 +66,7 @@ export function useCommerciauxLogic() {
   const { data: directeurs } = useDirecteurs()
   const { mutate: updateCommercial, loading: updating } = useUpdateCommercial()
   const { showError, showSuccess } = useErrorToast()
-
-  const getStatusMeta = useCallback(status => {
-    if (!status) {
-      return {
-        label: 'Inconnu',
-        badgeClass: 'bg-gray-100 text-gray-800 border-gray-200',
-      }
-    }
-    return (
-      USER_STATUS_OPTIONS.find(option => option.value === status) || {
-        label: status,
-        badgeClass: 'bg-gray-100 text-gray-800 border-gray-200',
-      }
-    )
-  }, [])
-
-  const renderStatusBadge = useCallback(
-    status => {
-      const meta = getStatusMeta(status)
-      return <Badge className={`${meta.badgeClass} border`}>{meta.label}</Badge>
-    },
-    [getStatusMeta]
-  )
+  const { renderStatusBadge } = useStatusBadge()
 
   // Les données sont déjà filtrées côté serveur
   const filteredCommercials = useMemo(() => commercials || [], [commercials])
@@ -131,27 +92,8 @@ export function useCommerciauxLogic() {
       const directeur = directeurs?.find(d => d.id === commercial.directeurId)
       const directeurName = directeur ? `${directeur.prenom} ${directeur.nom}` : 'N/A'
 
-      // Calculer les statistiques totales
-      const totalStatistics = commercial.statistics || []
-      const totalContratsSignes = totalStatistics.reduce(
-        (sum, stat) => sum + stat.contratsSignes,
-        0
-      )
-      const totalImmeublesVisites = totalStatistics.reduce(
-        (sum, stat) => sum + stat.immeublesVisites,
-        0
-      )
-      const totalRendezVousPris = totalStatistics.reduce(
-        (sum, stat) => sum + stat.rendezVousPris,
-        0
-      )
-
-      // Calculer le rang basé sur les statistiques réelles
-      const { rank, points } = calculateRank(
-        totalContratsSignes,
-        totalRendezVousPris,
-        totalImmeublesVisites
-      )
+      const { contratsSignes: totalContratsSignes, rendezVousPris: totalRendezVousPris, immeublesVisites: totalImmeublesVisites } = aggregateStats(commercial.statistics)
+      const { rank, points } = calculateRank(totalContratsSignes, totalRendezVousPris, totalImmeublesVisites)
 
       // Créer le badge de rang
       const rankBadge = (
@@ -225,17 +167,17 @@ export function useCommerciauxLogic() {
       section: 'Affectation',
       options: managerOptions,
     },
-    {
-      key: 'status',
-      label: 'Statut',
-      type: 'select',
-      section: 'Statut',
-      options: USER_STATUS_OPTIONS.map(option => ({
-        value: option.value,
-        label: option.label,
-      })),
-      hint: 'Statut du commercial',
-    },
+     {
+       key: 'status',
+       label: 'Statut',
+       type: 'select',
+       section: 'Statut',
+       options: USER_STATUS_CONFIG.map(option => ({
+         value: option.value,
+         label: option.label,
+       })),
+       hint: 'Statut du commercial',
+     },
   ]
 
   const handleEditCommercial = async editedData => {
@@ -268,9 +210,6 @@ export function useCommerciauxLogic() {
     refetch,
     commerciauxEditFields,
     handleEditCommercial,
-    statusOptions: USER_STATUS_OPTIONS.map(option => ({
-      value: option.value,
-      label: option.label,
-    })),
+    statusOptions: getStatusFilterOptions(),
   }
 }

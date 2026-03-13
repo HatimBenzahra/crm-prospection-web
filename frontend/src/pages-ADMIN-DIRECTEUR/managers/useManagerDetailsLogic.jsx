@@ -15,7 +15,7 @@ import {
   useFilteredPortes,
 } from '@/hooks/utils/filters/useStatisticsFilter'
 import { useMemo, useState } from 'react'
-import { calculateRank } from '@/utils/business/ranks'
+import { calculateRank, calculateRankFromStats, aggregateStats } from '@/utils/business/ranks'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import DateRangeFilter from '@/components/DateRangeFilter'
@@ -78,20 +78,7 @@ export function useManagerDetailsLogic() {
   const memoizedManagerRank = useMemo(() => {
     if (!manager?.statistics) return null
 
-    const totalContratsSignes = manager.statistics.reduce(
-      (sum, stat) => sum + stat.contratsSignes,
-      0
-    )
-    const totalRendezVousPris = manager.statistics.reduce(
-      (sum, stat) => sum + stat.rendezVousPris,
-      0
-    )
-    const totalImmeublesVisites = manager.statistics.reduce(
-      (sum, stat) => sum + stat.immeublesVisites,
-      0
-    )
-
-    return calculateRank(totalContratsSignes, totalRendezVousPris, totalImmeublesVisites)
+    return calculateRankFromStats(manager.statistics)
   }, [manager?.statistics])
 
   // Transformation des données API vers format UI (avec filtrage)
@@ -109,9 +96,7 @@ export function useManagerDetailsLogic() {
       const commercialAvecRangs = assignedCommercials.map(commercial => {
         // Utiliser les stats filtrées du commercial
         const stats = filteredCommercialsStats[commercial.id] || []
-        const contratsSignes = stats.reduce((sum, stat) => sum + stat.contratsSignes, 0)
-        const rendezVous = stats.reduce((sum, stat) => sum + stat.rendezVousPris, 0)
-        const immeubles = stats.reduce((sum, stat) => sum + stat.immeublesVisites, 0)
+        const { contratsSignes, rendezVousPris: rendezVous, immeublesVisites: immeubles } = aggregateStats(stats)
         const { rank: commercialRank, points: commercialPoints } = calculateRank(
           contratsSignes,
           rendezVous,
@@ -329,10 +314,7 @@ export function useManagerDetailsLogic() {
       .map(commercial => {
         // Utiliser les stats filtrées du commercial
         const stats = filteredCommercialsStats[commercial.id] || []
-        const contratsSignes = stats.reduce((sum, stat) => sum + stat.contratsSignes, 0)
-        const rendezVous = stats.reduce((sum, stat) => sum + stat.rendezVousPris, 0)
-        const immeubles = stats.reduce((sum, stat) => sum + stat.immeublesVisites, 0)
-        const refus = stats.reduce((sum, stat) => sum + stat.refus, 0)
+        const { contratsSignes, rendezVousPris: rendezVous, immeublesVisites: immeubles, refus } = aggregateStats(stats)
         const { rank: commercialRank, points: commercialPoints } = calculateRank(
           contratsSignes,
           rendezVous,

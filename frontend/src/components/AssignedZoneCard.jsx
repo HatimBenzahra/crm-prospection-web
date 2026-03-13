@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import Map, { Marker, Source, Layer, NavigationControl, useControl } from 'react-map-gl/mapbox'
+import MapboxMap, { Marker, Source, Layer, NavigationControl, useControl } from 'react-map-gl/mapbox'
 import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
@@ -314,9 +314,16 @@ export default function AssignedZoneCard({
 
         {/* Overlay de verrouillage */}
         {isMapLocked && !isFullscreen && (
-          <div
+          <button
+            type="button"
             className="absolute inset-0 z-20 bg-transparent cursor-pointer flex items-center justify-center group"
             onClick={() => setIsMapLocked(false)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setIsMapLocked(false)
+              }
+            }}
           >
             <div className="bg-background/90 backdrop-blur-sm px-4 py-2 rounded-lg border-2 border-primary/20 opacity-0 group-hover:opacity-100 transition-opacity">
               <div className="flex items-center gap-2 text-sm font-medium">
@@ -324,10 +331,10 @@ export default function AssignedZoneCard({
                 <span>Cliquez pour déverrouiller la carte</span>
               </div>
             </div>
-          </div>
+          </button>
         )}
 
-        <Map
+        <MapboxMap
           ref={mapRef}
           initialViewState={mapCenter}
           style={{ height: actualHeight, width: '100%', borderRadius: '0.5rem' }}
@@ -360,12 +367,20 @@ export default function AssignedZoneCard({
               longitude={immeuble.longitude}
               latitude={immeuble.latitude}
             >
-              <div
+              <button
+                type="button"
                 className="relative cursor-pointer group"
                 title={`${immeuble.adresse}\n${immeuble.nbEtages} étages, ${immeuble.nbPortesParEtage} portes/étage\nCliquez pour voir les détails`}
                 onClick={e => {
                   e.stopPropagation()
                   handleImmeubleClick(immeuble.id)
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleImmeubleClick(immeuble.id)
+                  }
                 }}
               >
                 {/* Icône bâtiment */}
@@ -376,10 +391,10 @@ export default function AssignedZoneCard({
                 {/* Tooltip au survol */}
                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                   <div className="font-medium">{immeuble.adresse}</div>
-                  <div className="text-gray-300">
+                  <div className="text-gray-200">
                     {immeuble.nbEtages} étages • {immeuble.nbPortesParEtage} portes/étage
                   </div>
-                  <div className="text-gray-300">
+                  <div className="text-gray-200">
                     Total: {immeuble.nbEtages * immeuble.nbPortesParEtage} portes
                   </div>
                   <div className="text-blue-300 mt-1 text-center">
@@ -388,7 +403,7 @@ export default function AssignedZoneCard({
                   {/* Flèche du tooltip */}
                   <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                 </div>
-              </div>
+              </button>
             </Marker>
           ))}
 
@@ -407,7 +422,7 @@ export default function AssignedZoneCard({
               />
             </Source>
           )}
-        </Map>
+        </MapboxMap>
       </div>
     )
   }

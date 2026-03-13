@@ -3,50 +3,13 @@ import { useEcoutesUsers } from '@/hooks/ecoutes/useEcoutesUsers'
 import { usePagination } from '@/hooks/utils/data/usePagination'
 import { useErrorToast } from '@/hooks/utils/ui/use-error-toast'
 import { RecordingService } from '@/services/audio'
-
-const USER_STATUS_OPTIONS = [
-  { value: 'ACTIF', label: 'Actif' },
-  { value: 'CONTRAT_FINIE', label: 'Contrat terminé' },
-  { value: 'UTILISATEUR_TEST', label: 'Utilisateur test' },
-]
-
-function buildUserLookup(users) {
-  const lookup = new Map()
-  for (const user of users) {
-    const safeRoom = `room_${(user.userType || '').toLowerCase()}_${user.id}`
-    lookup.set(safeRoom, user)
-  }
-  return lookup
-}
-
-function enrichRecordingWithUser(recording, userLookup) {
-  const keyParts = recording.key.split('/').filter(Boolean)
-  const safeRoom = keyParts.length >= 2 ? keyParts[keyParts.length - 2] : ''
-  const user = userLookup.get(safeRoom)
-
-  const userName = user ? `${user.prenom || ''} ${user.nom || ''}`.trim() : ''
-  return {
-    id: recording.key,
-    key: recording.key,
-    url: null,
-    rawUrl: null,
-    size: recording.size,
-    lastModified: recording.lastModified,
-    filename: recording.key.split('/').pop() || '',
-    date: recording.lastModified
-      ? new Date(recording.lastModified).toLocaleDateString()
-      : '',
-    time: recording.lastModified
-      ? new Date(recording.lastModified).toLocaleTimeString()
-      : '',
-    duration: RecordingService.formatFileSize(recording.size),
-    userId: user?.id,
-    userType: user?.userType,
-    userName,
-    userPrenom: user?.prenom,
-    userNom: user?.nom,
-  }
-}
+import { getStatusFilterOptions } from '@/constants/domain/user-status'
+import {
+  buildUserLookup,
+  enrichRecordingWithUser,
+  filterRecordings,
+  sortRecordings,
+} from './ecoutes-utils'
 
 export function useEnregistrementLogic() {
   const { allUsers, loading, error, refetch } = useEcoutesUsers()
@@ -76,7 +39,7 @@ export function useEnregistrementLogic() {
   speechScoresRef.current = speechScores
 
   const statusFilterOptions = useMemo(
-    () => [{ value: 'ALL', label: 'Tous' }, ...USER_STATUS_OPTIONS],
+    () => [{ value: 'ALL', label: 'Tous' }, ...getStatusFilterOptions()],
     []
   )
 
@@ -111,7 +74,7 @@ export function useEnregistrementLogic() {
       if (!isActive) return
 
       const enriched = items.map(recording =>
-        enrichRecordingWithUser(recording, userLookup)
+        enrichRecordingWithUser(recording, userLookup, RecordingService.formatFileSize)
       )
 
       setRecentRecordings(enriched)
@@ -252,53 +215,15 @@ export function useEnregistrementLogic() {
     }
   }, [showSuccess, showError])
 
-  // Filtrer les enregistrements selon la recherche
-  const filteredRecordings = useMemo(() => {
-    if (!recordings) return []
-    return recordings.filter(recording => {
-      const searchMatch =
-        !searchTerm || recording.filename.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredRecordings = useMemo(
+    () => filterRecordings(recordings, searchTerm, dateFrom, dateTo),
+    [recordings, searchTerm, dateFrom, dateTo]
+  )
 
-      const dateMatch = (() => {
-        if (!dateFrom && !dateTo) return true
-        const recDate = new Date(recording.lastModified).getTime()
-        const from = dateFrom ? new Date(dateFrom).setHours(0, 0, 0, 0) : -Infinity
-        const to = dateTo ? new Date(dateTo).setHours(23, 59, 59, 999) : Infinity
-        return recDate >= from && recDate <= to
-      })()
-
-      return searchMatch && dateMatch
-    })
-  }, [recordings, searchTerm, dateFrom, dateTo])
-
-  const sortedRecordings = useMemo(() => {
-    if (!filteredRecordings?.length) return []
-
-    const sorted = [...filteredRecordings].sort((a, b) => {
-      let leftValue
-      let rightValue
-
-      if (sortConfig.key === 'filename') {
-        leftValue = a.filename.toLowerCase()
-        rightValue = b.filename.toLowerCase()
-      } else if (sortConfig.key === 'size') {
-        leftValue = a.size
-        rightValue = b.size
-      } else if (sortConfig.key === 'speechScore') {
-        leftValue = speechScores.get(a.key)?.score ?? -1
-        rightValue = speechScores.get(b.key)?.score ?? -1
-      } else {
-        leftValue = new Date(a.lastModified).getTime()
-        rightValue = new Date(b.lastModified).getTime()
-      }
-
-      if (leftValue < rightValue) return -1
-      if (leftValue > rightValue) return 1
-      return 0
-    })
-
-    return sortConfig.direction === 'asc' ? sorted : sorted.reverse()
-  }, [filteredRecordings, sortConfig, speechScores])
+  const sortedRecordings = useMemo(
+    () => sortRecordings(filteredRecordings, sortConfig, speechScores),
+    [filteredRecordings, sortConfig, speechScores]
+  )
 
   // Utiliser le hook de pagination
   const {

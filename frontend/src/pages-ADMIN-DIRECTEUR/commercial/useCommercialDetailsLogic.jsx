@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom'
 import { useCommercialFull, useManagers, useCurrentZoneAssignment } from '@/services'
 import { useMemo, useState } from 'react'
-import { calculateRank } from '@/utils/business/ranks'
+import { calculateRank, aggregateStats } from '@/utils/business/ranks'
 import { Badge } from '@/components/ui/badge'
 import DateRangeFilter from '@/components/DateRangeFilter'
 import { useDateFilter } from '@/hooks/utils/filters/useDateFilter'
@@ -39,25 +39,17 @@ export function useCommercialDetailsLogic() {
   const backendStats = useMemo(() => {
     if (!commercial?.statistics) return null
     
-    return commercial.statistics.reduce((acc, stat) => ({
-      totalContratsSignes: acc.totalContratsSignes + stat.contratsSignes,
-      totalImmeublesVisites: acc.totalImmeublesVisites + stat.immeublesVisites,
-      totalRendezVousPris: acc.totalRendezVousPris + stat.rendezVousPris,
-      totalRefus: acc.totalRefus + stat.refus,
-      totalAbsents: acc.totalAbsents + (stat.absents || 0),
-      totalArgumentes: acc.totalArgumentes + (stat.argumentes || 0),
-      totalPortesProspectes: acc.totalPortesProspectes + (stat.nbPortesProspectes || 0),
-      totalImmeublesProspectes: acc.totalImmeublesProspectes + (stat.nbImmeublesProspectes || 0),
-    }), {
-      totalContratsSignes: 0,
-      totalImmeublesVisites: 0,
-      totalRendezVousPris: 0,
-      totalRefus: 0,
-      totalAbsents: 0,
-      totalArgumentes: 0,
-      totalPortesProspectes: 0,
-      totalImmeublesProspectes: 0,
-    })
+    const { contratsSignes, immeublesVisites, rendezVousPris, refus } = aggregateStats(commercial.statistics)
+    return {
+      totalContratsSignes: contratsSignes,
+      totalImmeublesVisites: immeublesVisites,
+      totalRendezVousPris: rendezVousPris,
+      totalRefus: refus,
+      totalAbsents: commercial.statistics.reduce((sum, stat) => sum + (stat.absents || 0), 0),
+      totalArgumentes: commercial.statistics.reduce((sum, stat) => sum + (stat.argumentes || 0), 0),
+      totalPortesProspectes: commercial.statistics.reduce((sum, stat) => sum + (stat.nbPortesProspectes || 0), 0),
+      totalImmeublesProspectes: commercial.statistics.reduce((sum, stat) => sum + (stat.nbImmeublesProspectes || 0), 0),
+    }
   }, [commercial?.statistics])
 
   // Calculer le rang du commercial basé sur TOUTES ses stats (non filtrées)

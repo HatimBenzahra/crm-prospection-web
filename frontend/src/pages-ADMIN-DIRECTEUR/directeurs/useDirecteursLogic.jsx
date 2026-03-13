@@ -3,25 +3,8 @@ import { useDirecteurs, useUpdateDirecteur } from '@/services'
 import { useEntityPage } from '@/hooks/metier/permissions/useRoleBasedData'
 import { useErrorToast } from '@/hooks/utils/ui/use-error-toast'
 import { useRole } from '@/contexts/userole'
-import { Badge } from '@/components/ui/badge'
-
-const USER_STATUS_OPTIONS = [
-  {
-    value: 'ACTIF',
-    label: 'Actif',
-    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  },
-  {
-    value: 'CONTRAT_FINIE',
-    label: 'Contrat fini',
-    badgeClass: 'bg-orange-100 text-orange-800 border-orange-200',
-  },
-  {
-    value: 'UTILISATEUR_TEST',
-    label: 'Utilisateur test',
-    badgeClass: 'bg-blue-100 text-blue-800 border-blue-200',
-  },
-]
+import { USER_STATUS_CONFIG, getStatusFilterOptions } from '@/constants/domain/user-status'
+import { useStatusBadge } from '@/hooks/utils/ui/useStatusBadge'
 
 export function useDirecteursLogic() {
   const { showError, showSuccess } = useErrorToast()
@@ -38,28 +21,7 @@ export function useDirecteursLogic() {
     description,
   } = useEntityPage('directeurs', directeursApi || [])
 
-  const getStatusMeta = useCallback(status => {
-    if (!status) {
-      return {
-        label: 'Inconnu',
-        badgeClass: 'bg-gray-100 text-gray-800 border-gray-200',
-      }
-    }
-    return (
-      USER_STATUS_OPTIONS.find(option => option.value === status) || {
-        label: status,
-        badgeClass: 'bg-gray-100 text-gray-800 border-gray-200',
-      }
-    )
-  }, [])
-
-  const renderStatusBadge = useCallback(
-    status => {
-      const meta = getStatusMeta(status)
-      return <Badge className={`${meta.badgeClass} border`}>{meta.label}</Badge>
-    },
-    [getStatusMeta]
-  )
+  const { renderStatusBadge } = useStatusBadge()
 
   // Préparation des données pour le tableau avec mapping API → UI
   const tableData = useMemo(() => {
@@ -149,17 +111,17 @@ export function useDirecteursLogic() {
         fullWidth: true,
         placeholder: 'Adresse complète',
       },
-      {
-        key: 'status',
-        label: 'Statut',
-        type: 'select',
-        section: 'Statut',
-        options: USER_STATUS_OPTIONS.map(option => ({
-          value: option.value,
-          label: option.label,
-        })),
-        hint: 'Actif par défaut pour les nouveaux comptes.',
-      },
+       {
+         key: 'status',
+         label: 'Statut',
+         type: 'select',
+         section: 'Statut',
+         options: USER_STATUS_CONFIG.map(option => ({
+           value: option.value,
+           label: option.label,
+         })),
+         hint: 'Actif par défaut pour les nouveaux comptes.',
+       },
     ],
     []
   )
@@ -193,9 +155,6 @@ export function useDirecteursLogic() {
     directeursEditFields,
     handleEditDirecteur,
     isAdmin,
-    statusOptions: USER_STATUS_OPTIONS.map(option => ({
-      value: option.value,
-      label: option.label,
-    })),
+    statusOptions: getStatusFilterOptions(),
   }
 }

@@ -6,6 +6,7 @@ import { useRole } from '@/contexts/userole'
 import { DetailsSectionsProvider } from '@/contexts/DetailsSectionsProvider'
 import { AppLoadingProvider } from '@/contexts/AppLoadingProvider'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import SectionErrorBoundary from '@/components/SectionErrorBoundary'
 import SessionManager from '@/components/SessionManager'
 import { OfflineSyncProvider } from '@/components/OfflineSyncProvider'
 
@@ -117,8 +118,8 @@ function AdminLayout() {
                 <SidebarTrigger className="-ml-1" />
                 <Separator orientation="vertical" className="mr-2 h-4" />
                 <nav className="flex items-center space-x-2 text-sm font-medium text-muted-foreground">
-                  {breadcrumbs.map((crumb, index) => (
-                    <React.Fragment key={`${crumb.href}-${index}`}>
+                    {breadcrumbs.map((crumb, index) => (
+                      <React.Fragment key={`${crumb.href}-${crumb.label}-${crumb.isCurrent ? 'current' : 'link'}`}>
                       {index > 0 && <span className="text-muted-foreground">›</span>}
                       {crumb.isCurrent ? (
                         <span className="text-foreground">{crumb.label}</span>
@@ -139,26 +140,159 @@ function AdminLayout() {
             <div className="flex flex-1 flex-col gap-4 p-6 pt-6 overflow-x-hidden mx-auto w-11/12 max-w-[1400px]">
               <Suspense fallback={null}>
                 <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/commerciaux" element={<Commerciaux />} />
-                  <Route path="/commerciaux/:id" element={<CommercialDetails />} />
-                  <Route path="/managers" element={<Managers />} />
-                  <Route path="/managers/:id" element={<ManagerDetails />} />
-                  <Route path="/directeurs" element={<Directeurs />} />
-                  <Route path="/directeurs/:id" element={<DirecteurDetails />} />
-                  <Route path="/immeubles" element={<Immeubles />} />
-                  <Route path="/immeubles/:id" element={<ImmeubleDetails />} />
-                  <Route path="/zones" element={<Zones />} />
-                  <Route path="/zones/historique" element={<HistoriqueZones />} />
-                  <Route path="/zones/assignations" element={<AssignationsEnCours />} />
-                  <Route path="/zones/:id" element={<ZoneDetails />} />
-                  <Route path="/gestion" element={<Gestion />} />
-                  <Route path="/gps-tracking" element={<GPSTracking />} />
+                  <Route
+                    path="/"
+                    element={
+                      <SectionErrorBoundary>
+                        <Dashboard />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/commerciaux"
+                    element={
+                      <SectionErrorBoundary>
+                        <Commerciaux />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/commerciaux/:id"
+                    element={
+                      <SectionErrorBoundary>
+                        <CommercialDetails />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/managers"
+                    element={
+                      <SectionErrorBoundary>
+                        <Managers />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/managers/:id"
+                    element={
+                      <SectionErrorBoundary>
+                        <ManagerDetails />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/directeurs"
+                    element={
+                      <SectionErrorBoundary>
+                        <Directeurs />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/directeurs/:id"
+                    element={
+                      <SectionErrorBoundary>
+                        <DirecteurDetails />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/immeubles"
+                    element={
+                      <SectionErrorBoundary>
+                        <Immeubles />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/immeubles/:id"
+                    element={
+                      <SectionErrorBoundary>
+                        <ImmeubleDetails />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/zones"
+                    element={
+                      <SectionErrorBoundary>
+                        <Zones />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/zones/historique"
+                    element={
+                      <SectionErrorBoundary>
+                        <HistoriqueZones />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/zones/assignations"
+                    element={
+                      <SectionErrorBoundary>
+                        <AssignationsEnCours />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/zones/:id"
+                    element={
+                      <SectionErrorBoundary>
+                        <ZoneDetails />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/gestion"
+                    element={
+                      <SectionErrorBoundary>
+                        <Gestion />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/gps-tracking"
+                    element={
+                      <SectionErrorBoundary>
+                        <GPSTracking />
+                      </SectionErrorBoundary>
+                    }
+                  />
                   <Route path="/ecoutes" element={<Navigate to="/ecoutes/live" replace />} />
-                  <Route path="/ecoutes/live" element={<EcouteLive />} />
-                  <Route path="/ecoutes/enregistrement" element={<Enregistrement />} />
-                  <Route path="/statistiques" element={<Statistiques />} />
-                  <Route path="/gamification/*" element={<Gamification />} />
+                  <Route
+                    path="/ecoutes/live"
+                    element={
+                      <SectionErrorBoundary>
+                        <EcouteLive />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/ecoutes/enregistrement"
+                    element={
+                      <SectionErrorBoundary>
+                        <Enregistrement />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/statistiques"
+                    element={
+                      <SectionErrorBoundary>
+                        <Statistiques />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/gamification/*"
+                    element={
+                      <SectionErrorBoundary>
+                        <Gamification />
+                      </SectionErrorBoundary>
+                    }
+                  />
                 </Routes>
               </Suspense>
             </div>

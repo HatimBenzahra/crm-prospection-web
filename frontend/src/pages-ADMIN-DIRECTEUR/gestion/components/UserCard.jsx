@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Mail, Phone, GripVertical } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { aggregateStats } from '@/utils/business/ranks'
 
 /**
  * Carte d'utilisateur draggable et droppable
@@ -131,24 +132,27 @@ export default function UserCard({ user, type, isDragging = false, showGrip = tr
             </div>
 
             {/* Statistiques pour commerciaux */}
-            {type === 'commercial' && user.statistics && user.statistics.length > 0 && (
-              <div className="pt-2 border-t">
-                <div className="flex gap-3 text-xs">
-                  <div>
-                    <span className="font-semibold text-foreground">
-                      {user.statistics.reduce((sum, stat) => sum + stat.contratsSignes, 0)}
-                    </span>
-                    <span className="text-muted-foreground"> contrats</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-foreground">
-                      {user.statistics.reduce((sum, stat) => sum + stat.immeublesVisites, 0)}
-                    </span>
-                    <span className="text-muted-foreground"> immeubles</span>
+            {type === 'commercial' && user.statistics && user.statistics.length > 0 && (() => {
+              const { contratsSignes, immeublesVisites } = aggregateStats(user.statistics)
+              return (
+                <div className="pt-2 border-t">
+                  <div className="flex gap-3 text-xs">
+                    <div>
+                      <span className="font-semibold text-foreground">
+                        {contratsSignes}
+                      </span>
+                      <span className="text-muted-foreground"> contrats</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-foreground">
+                        {immeublesVisites}
+                      </span>
+                      <span className="text-muted-foreground"> immeubles</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* Compteurs pour managers */}
             {type === 'manager' && (

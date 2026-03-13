@@ -29,7 +29,7 @@ export default defineConfig({
     cssMinify: true,
     sourcemap: false, // Disable in production for smaller bundles
     modulePreload: {
-      resolveDependencies(filename, deps, context) {
+      resolveDependencies(_filename, deps, context) {
         if (context.hostType === 'html') {
           return deps.filter(dep => !dep.includes('vendor-mapbox'))
         }
@@ -107,5 +107,10 @@ export default defineConfig({
   // Optimize dependencies
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom'],
+  },
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['src/**/*.test.{js,jsx}'],
   },
 })

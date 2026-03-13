@@ -67,3 +67,20 @@ export const getNextRank = currentPoints => {
   const pointsToNextRank = nextRank ? nextRank.minPoints - currentPoints : 0
   return { nextRank, pointsToNextRank }
 }
+
+export function aggregateStats(statistics) {
+  if (!statistics || statistics.length === 0) {
+    return { contratsSignes: 0, rendezVousPris: 0, immeublesVisites: 0, refus: 0 }
+  }
+  return {
+    contratsSignes: statistics.reduce((sum, stat) => sum + stat.contratsSignes, 0),
+    rendezVousPris: statistics.reduce((sum, stat) => sum + stat.rendezVousPris, 0),
+    immeublesVisites: statistics.reduce((sum, stat) => sum + stat.immeublesVisites, 0),
+    refus: statistics.reduce((sum, stat) => sum + (stat.refus || 0), 0),
+  }
+}
+
+export function calculateRankFromStats(statistics) {
+  const { contratsSignes, rendezVousPris, immeublesVisites } = aggregateStats(statistics)
+  return calculateRank(contratsSignes, rendezVousPris, immeublesVisites)
+}

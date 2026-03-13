@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react'
-import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox'
+import MapboxMap, { Marker, NavigationControl } from 'react-map-gl/mapbox'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import mapboxgl from 'mapbox-gl'
 import { Card } from '@/components/ui/card'
@@ -78,18 +78,11 @@ const CommercialListItem = React.memo(function CommercialListItem({
   const isActive = gpsData && new Date(gpsData.lastUpdate) > new Date(Date.now() - 3600000)
 
   return (
-    <div
+    <button
+      type="button"
       ref={itemRef}
-      role="button"
-      tabIndex={0}
-      aria-selected={isSelected}
+      aria-pressed={isSelected}
       onClick={onClick}
-      onKeyDown={e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onClick?.()
-        }
-      }}
       className={`group p-3 sm:p-4 rounded-lg border cursor-pointer outline-none transition-all duration-200 ease-out scroll-mt-2
         ${
           isSelected
@@ -137,6 +130,7 @@ const CommercialListItem = React.memo(function CommercialListItem({
           <button
             type="button"
             title="Centrer sur la carte"
+            aria-label={`Centrer la carte sur ${commercial.prenom} ${commercial.nom}`}
             className="h-8 w-8 p-0 shrink-0 rounded-md hover:bg-accent transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             onClick={e => {
               e.stopPropagation()
@@ -147,7 +141,7 @@ const CommercialListItem = React.memo(function CommercialListItem({
           </button>
         )}
       </div>
-    </div>
+    </button>
   )
 })
 
@@ -168,6 +162,17 @@ export default function GPSTracking() {
   const [mapError, setMapError] = useState(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const mapRef = useRef(null)
+
+  useEffect(() => {
+    if (!isFullscreen) return
+    const onKeyDown = event => {
+      if (event.key === 'Escape') {
+        setIsFullscreen(false)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isFullscreen])
 
   // Vérifier token Mapbox
   useEffect(() => {
@@ -399,7 +404,7 @@ export default function GPSTracking() {
               </div>
             ) : (
               <>
-                <Map
+                <MapboxMap
                   ref={mapRef}
                   initialViewState={{
                     longitude: 2.3522,
@@ -448,7 +453,7 @@ export default function GPSTracking() {
                             className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg bg-black/90 text-white text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${isSelected ? 'opacity-100' : ''}`}
                           >
                             {commercial.prenom} {commercial.nom}
-                            <div className="text-[10px] text-gray-300">
+                            <div className="text-[10px] text-gray-200">
                               {formatLastUpdate(commercial.gpsData.lastUpdate)}
                             </div>
                           </div>
@@ -456,14 +461,16 @@ export default function GPSTracking() {
                       </Marker>
                     )
                   })}
-                </Map>
+                </MapboxMap>
 
                 {/* Bouton Fullscreen */}
                 <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 z-30">
                   <button
+                    type="button"
                     onClick={() => setIsFullscreen(true)}
                     className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-background border-2 border-border shadow-lg hover:bg-accent transition-colors flex items-center justify-center"
                     title="Agrandir la carte"
+                    aria-label="Ouvrir la carte en plein écran"
                   >
                     <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" />
                   </button>
@@ -492,8 +499,10 @@ export default function GPSTracking() {
               </div>
             </div>
             <button
+              type="button"
               onClick={() => setIsFullscreen(false)}
               className="h-10 w-10 rounded-lg border-2 border-border hover:bg-accent transition-colors flex items-center justify-center shrink-0"
+              aria-label="Fermer la vue plein écran"
             >
               <X className="h-5 w-5" />
             </button>
@@ -509,7 +518,7 @@ export default function GPSTracking() {
                 </div>
               </div>
             ) : (
-              <Map
+              <MapboxMap
                 initialViewState={{
                   longitude: 2.3522,
                   latitude: 48.8566,
@@ -555,7 +564,7 @@ export default function GPSTracking() {
                           className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-2 rounded-lg bg-black/90 text-white text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${isSelected ? 'opacity-100' : ''}`}
                         >
                           {commercial.prenom} {commercial.nom}
-                          <div className="text-xs text-gray-300">
+                          <div className="text-xs text-gray-200">
                             {formatLastUpdate(commercial.gpsData.lastUpdate)}
                           </div>
                         </div>
@@ -563,7 +572,7 @@ export default function GPSTracking() {
                     </Marker>
                   )
                 })}
-              </Map>
+              </MapboxMap>
             )}
           </div>
 

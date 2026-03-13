@@ -10,7 +10,7 @@ import {
 import { useRole } from '@/contexts/userole'
 import { useErrorToast } from '@/hooks/utils/ui/use-error-toast'
 import { useMemo, useState } from 'react'
-import { calculateRank } from '@/utils/business/ranks'
+import { calculateRank, aggregateStats } from '@/utils/business/ranks'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -77,18 +77,8 @@ export function useDirecteurDetailsLogic() {
     if (assignedManagers.length > 0) {
       const managersAvecStats = assignedManagers.map(manager => {
         const managerCommercials = allCommercials?.filter(c => c.managerId === manager.id) || []
-        const managerContratsSignes = managerCommercials.reduce((sum, commercial) => {
-          const stats = commercial.statistics || []
-          return sum + stats.reduce((statSum, stat) => statSum + stat.contratsSignes, 0)
-        }, 0)
-        const managerRendezVous = managerCommercials.reduce((sum, commercial) => {
-          const stats = commercial.statistics || []
-          return sum + stats.reduce((statSum, stat) => statSum + stat.rendezVousPris, 0)
-        }, 0)
-        const managerImmeubles = managerCommercials.reduce((sum, commercial) => {
-          const stats = commercial.statistics || []
-          return sum + stats.reduce((statSum, stat) => statSum + stat.immeublesVisites, 0)
-        }, 0)
+        const allStats = managerCommercials.flatMap(c => c.statistics || [])
+        const { contratsSignes: managerContratsSignes, rendezVousPris: managerRendezVous, immeublesVisites: managerImmeubles } = aggregateStats(allStats)
 
         const { rank: managerRank, points: managerPoints } = calculateRank(
           managerContratsSignes,
@@ -120,9 +110,7 @@ export function useDirecteurDetailsLogic() {
     if (allDirecteurCommercials.length > 0) {
       const commercialAvecRangs = allDirecteurCommercials.map(commercial => {
         const stats = commercial.statistics || []
-        const contratsSignes = stats.reduce((sum, stat) => sum + stat.contratsSignes, 0)
-        const rendezVous = stats.reduce((sum, stat) => sum + stat.rendezVousPris, 0)
-        const immeubles = stats.reduce((sum, stat) => sum + stat.immeublesVisites, 0)
+        const { contratsSignes, rendezVousPris: rendezVous, immeublesVisites: immeubles } = aggregateStats(stats)
         const { rank: commercialRank, points: commercialPoints } = calculateRank(
           contratsSignes,
           rendezVous,

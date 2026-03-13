@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
@@ -511,7 +511,7 @@ function BadgeIcon({ badge }) {
 
   useEffect(() => {
     setImgFailed(false)
-  }, [iconUrl])
+  }, [])
 
   return (
     <div
@@ -578,7 +578,13 @@ function CommercialBadgesCell({ commercialId, managerId, periodKey }) {
             className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${style.bg} ${style.border}`}
           >
             {iconUrl ? (
-              <img src={iconUrl} alt="" className="h-3.5 w-3.5 object-contain" loading="lazy" />
+              <img
+                src={iconUrl}
+                alt=""
+                aria-hidden="true"
+                className="h-3.5 w-3.5 object-contain"
+                loading="lazy"
+              />
             ) : (
               <style.Icon className={`h-3 w-3 ${style.color}`} />
             )}
@@ -626,20 +632,20 @@ function DetailModal({
     })
   }
 
-  const getPeriodField = pk => {
+  const getPeriodField = useCallback(pk => {
     if (/^\d{4}-W\d{2}$/.test(pk)) return 'periodWeek'
     if (/^\d{4}-Q\d$/.test(pk)) return 'periodQuarter'
     if (/^\d{4}$/.test(pk)) return 'periodYear'
     if (/^\d{4}-\d{2}-\d{2}$/.test(pk)) return 'periodDay'
     if (/^\d{4}-\d{2}$/.test(pk)) return 'periodMonth'
     return 'periodMonth'
-  }
+  }, [])
 
   const contrats = useMemo(() => {
     if (!rawContrats) return []
     const field = getPeriodField(periodKey)
     return rawContrats.filter(c => c[field] === periodKey)
-  }, [rawContrats, periodKey])
+  }, [rawContrats, periodKey, getPeriodField])
 
   const badges = useMemo(() => {
     return (rawBadges || [])
@@ -737,6 +743,7 @@ function DetailModal({
                                 <img
                                   src={iconUrl}
                                   alt=""
+                                  aria-hidden="true"
                                   className="h-6 w-6 object-contain"
                                   loading="lazy"
                                 />
@@ -782,6 +789,7 @@ function DetailModal({
                           <img
                             src={getOffreLogoUrl(contrat.offreLogoUrl)}
                             alt=""
+                            aria-hidden="true"
                             className="h-9 w-9 rounded-lg border border-border/50 object-contain bg-muted/50 p-1 shrink-0"
                           />
                         ) : (
@@ -1911,6 +1919,7 @@ export default function Gamification() {
           const isActive = logic.activeTab === tab.id
           return (
             <button
+              type="button"
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
