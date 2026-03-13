@@ -45,6 +45,10 @@ import {
   SpeechScoreBar,
 } from './EnregistrementComponents'
 
+const HEADER_SKELETON_KEYS = ['header-1', 'header-2', 'header-3', 'header-4', 'header-5', 'header-6']
+const LIST_SKELETON_KEYS = ['list-1', 'list-2', 'list-3', 'list-4']
+const RECENT_SKELETON_KEYS = ['recent-1', 'recent-2', 'recent-3', 'recent-4', 'recent-5', 'recent-6']
+
 export default function Enregistrement() {
   const {
     filteredUsers,
@@ -126,7 +130,7 @@ export default function Enregistrement() {
       const match = filteredUsers.find(u => u.id === smartFilters.commercial.id)
       if (match) handleUserSelection(match)
     }
-  }, [smartFilters.commercial])
+  }, [smartFilters.commercial, filteredUsers, handleUserSelection])
 
   const recentPeriodOptions = [
     { value: 'all', label: 'Tous' },
@@ -204,7 +208,7 @@ export default function Enregistrement() {
     goToPreviousPage: goToPreviousRecentPage,
     hasNextPage: hasNextRecentPage,
     hasPreviousPage: hasPreviousRecentPage,
-  } = usePagination(filteredRecentRecordings, 9)
+  } = usePagination(filteredRecentRecordings, 20)
 
   const openRecentModal = useCallback((rec) => {
     const idx = filteredRecentRecordings.findIndex(r => r.id === rec.id)
@@ -225,13 +229,13 @@ export default function Enregistrement() {
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-xl border border-border/40 bg-muted/20 animate-pulse" />
+          {HEADER_SKELETON_KEYS.map(key => (
+            <div key={key} className="h-16 rounded-xl border border-border/40 bg-muted/20 animate-pulse" />
           ))}
         </div>
         <div className="space-y-3">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-16 rounded-xl border border-border/40 bg-muted/20 animate-pulse" />
+          {LIST_SKELETON_KEYS.map(key => (
+            <div key={key} className="h-16 rounded-xl border border-border/40 bg-muted/20 animate-pulse" />
           ))}
         </div>
       </div>
@@ -297,6 +301,7 @@ export default function Enregistrement() {
                     : smartFilters.period === opt.value
                   return (
                     <button
+                      type="button"
                       key={opt.value}
                       onClick={() =>
                         setSmartFilters(prev => ({
@@ -324,8 +329,8 @@ export default function Enregistrement() {
         <CardContent className="pt-0">
           {loadingRecentRecordings ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 rounded-xl" />
+              {RECENT_SKELETON_KEYS.map(key => (
+                <Skeleton key={key} className="h-16 rounded-xl" />
               ))}
             </div>
           ) : filteredRecentRecordings.length > 0 ? (

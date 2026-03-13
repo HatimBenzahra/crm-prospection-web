@@ -94,6 +94,12 @@ export class ExtractionQueueItemDto {
 }
 
 @ObjectType()
+export class PaginatedRecordingsResult {
+  @Field(() => [RecordingItem]) items: RecordingItem[];
+  @Field(() => Int) totalCount: number;
+}
+
+@ObjectType()
 export class SpeechScoreDto {
   @Field() key: string;
   @Field(() => Int, { nullable: true }) score?: number;

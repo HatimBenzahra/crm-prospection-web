@@ -3,9 +3,7 @@ import { logger as Logger } from '../../core/graphql'
 import type {
   RecordingData,
   EnrichedRecording,
-  StartRecordingInput,
   StartRecordingResponse,
-  StopRecordingInput,
 } from './recording.types'
 
 // GraphQL Queries pour les enregistrements
@@ -86,6 +84,19 @@ const GET_EXTRACTION_QUEUE = `
 const GET_PROCESSED_KEYS = `
   query GetProcessedKeys($keys: [String!]!) {
     getProcessedKeys(keys: $keys)
+  }
+`
+
+const LIST_ALL_RECORDINGS = `
+  query ListAllRecordings($roomNames: [String!]!) {
+    listAllRecordings(roomNames: $roomNames) {
+      items {
+        key
+        size
+        lastModified
+      }
+      totalCount
+    }
   }
 `
 
@@ -302,6 +313,22 @@ export class RecordingService {
       return new Set(data.getProcessedKeys || [])
     } catch {
       return new Set()
+    }
+  }
+
+  static async getAllRecentRecordings(
+    roomNames: string[]
+  ): Promise<{ items: RecordingData[]; totalCount: number }> {
+    try {
+      const data = await graphqlClient.request(LIST_ALL_RECORDINGS, { roomNames })
+      const result = data.listAllRecordings
+      const filteredItems = (result.items || []).filter(
+        (r: RecordingData) => r.key && r.key.toLowerCase().endsWith('.mp4')
+      )
+      return { items: filteredItems, totalCount: filteredItems.length }
+    } catch (error) {
+      console.error('Erreur récupération enregistrements agrégés:', error)
+      throw error
     }
   }
 

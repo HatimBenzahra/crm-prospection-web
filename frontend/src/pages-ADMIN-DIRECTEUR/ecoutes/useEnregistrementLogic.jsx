@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useEcoutesUsers } from '@/hooks/ecoutes/useEcoutesUsers'
 import { usePagination } from '@/hooks/utils/data/usePagination'
 import { useErrorToast } from '@/hooks/utils/ui/use-error-toast'
@@ -10,14 +10,42 @@ const USER_STATUS_OPTIONS = [
   { value: 'UTILISATEUR_TEST', label: 'Utilisateur test' },
 ]
 
-async function pMapConcurrent(items, asyncFn, concurrency = 3) {
-  const results = []
-  for (let i = 0; i < items.length; i += concurrency) {
-    const chunk = items.slice(i, i + concurrency)
-    const chunkResults = await Promise.allSettled(chunk.map(asyncFn))
-    results.push(...chunkResults)
+function buildUserLookup(users) {
+  const lookup = new Map()
+  for (const user of users) {
+    const safeRoom = `room_${(user.userType || '').toLowerCase()}_${user.id}`
+    lookup.set(safeRoom, user)
   }
-  return results
+  return lookup
+}
+
+function enrichRecordingWithUser(recording, userLookup) {
+  const keyParts = recording.key.split('/').filter(Boolean)
+  const safeRoom = keyParts.length >= 2 ? keyParts[keyParts.length - 2] : ''
+  const user = userLookup.get(safeRoom)
+
+  const userName = user ? `${user.prenom || ''} ${user.nom || ''}`.trim() : ''
+  return {
+    id: recording.key,
+    key: recording.key,
+    url: null,
+    rawUrl: null,
+    size: recording.size,
+    lastModified: recording.lastModified,
+    filename: recording.key.split('/').pop() || '',
+    date: recording.lastModified
+      ? new Date(recording.lastModified).toLocaleDateString()
+      : '',
+    time: recording.lastModified
+      ? new Date(recording.lastModified).toLocaleTimeString()
+      : '',
+    duration: RecordingService.formatFileSize(recording.size),
+    userId: user?.id,
+    userType: user?.userType,
+    userName,
+    userPrenom: user?.prenom,
+    userNom: user?.nom,
+  }
 }
 
 export function useEnregistrementLogic() {
@@ -44,6 +72,8 @@ export function useEnregistrementLogic() {
   const [selectedRecentIds, setSelectedRecentIds] = useState(new Set())
   const [processedKeys, setProcessedKeys] = useState(new Set())
   const [speechScores, setSpeechScores] = useState(new Map())
+  const speechScoresRef = useRef(speechScores)
+  speechScoresRef.current = speechScores
 
   const statusFilterOptions = useMemo(
     () => [{ value: 'ALL', label: 'Tous' }, ...USER_STATUS_OPTIONS],
@@ -71,48 +101,21 @@ export function useEnregistrementLogic() {
       setLoadingRecentRecordings(true)
       setRecentRecordingsError(null)
 
-      const settledResults = await pMapConcurrent(
-        allUsers,
-        user => RecordingService.getRecordingsForUser(user.id, user.userType),
-        3
+      const roomNames = allUsers.map(
+        user => `room:${(user.userType || '').toLowerCase()}:${user.id}`
       )
+      const userLookup = buildUserLookup(allUsers)
+
+      const { items } = await RecordingService.getAllRecentRecordings(roomNames)
 
       if (!isActive) return
 
-      const mergedRecordings = []
-      let failedCount = 0
-
-      settledResults.forEach((result, index) => {
-        const user = allUsers[index]
-
-        if (result.status === 'fulfilled') {
-          const userName = `${user.prenom || ''} ${user.nom || ''}`.trim()
-          const enrichedRecordings = result.value.map(recording => ({
-            ...recording,
-            userName,
-            userPrenom: user.prenom,
-            userNom: user.nom,
-            userType: user.userType,
-          }))
-          mergedRecordings.push(...enrichedRecordings)
-          return
-        }
-
-        failedCount += 1
-        console.warn('Erreur chargement enregistrements utilisateur:', {
-          userId: user?.id,
-          userType: user?.userType,
-          error: result.reason,
-        })
-      })
-
-      const sortedRecentRecordings = mergedRecordings
-        .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
-
-      setRecentRecordings(sortedRecentRecordings)
-      setRecentRecordingsError(
-        failedCount > 0 ? `${failedCount} utilisateur(s) non chargé(s)` : null
+      const enriched = items.map(recording =>
+        enrichRecordingWithUser(recording, userLookup)
       )
+
+      setRecentRecordings(enriched)
+      setRecentRecordingsError(null)
       setLoadingRecentRecordings(false)
     }
 
@@ -154,10 +157,29 @@ export function useEnregistrementLogic() {
 
     const fetchScores = async () => {
       if (!active) return
+
+      const currentScores = speechScoresRef.current
+      const keysToFetch = uniqueKeys.filter(k => {
+        const cached = currentScores.get(k)
+        return !cached || cached.status !== 'ready'
+      })
+
+      if (!keysToFetch.length) return
+
       try {
-        const results = await RecordingService.getSpeechScores(uniqueKeys)
+        const results = await RecordingService.getSpeechScores(keysToFetch)
         if (!active) return
         setSpeechScores(prev => {
+          let changed = false
+          for (const r of results) {
+            const existing = prev.get(r.key)
+            if (!existing || existing.status !== r.status || existing.score !== r.score) {
+              changed = true
+              break
+            }
+          }
+          if (!changed) return prev
+
           const next = new Map(prev)
           results.forEach(r => { next.set(r.key, r) })
           return next
@@ -206,7 +228,7 @@ export function useEnregistrementLogic() {
   }, [filteredUsers, selectedCommercialForRecordings, resetSelection])
 
   // Charger les enregistrements pour un utilisateur sélectionné
-  const loadRecordingsForCommercial = async commercial => {
+  const loadRecordingsForCommercial = useCallback(async commercial => {
     if (!commercial) {
       setRecordings([])
       return
@@ -228,7 +250,7 @@ export function useEnregistrementLogic() {
     } finally {
       setLoadingRecordings(false)
     }
-  }
+  }, [showSuccess, showError])
 
   // Filtrer les enregistrements selon la recherche
   const filteredRecordings = useMemo(() => {
@@ -289,7 +311,7 @@ export function useEnregistrementLogic() {
     goToPreviousPage,
     hasNextPage,
     hasPreviousPage,
-  } = usePagination(sortedRecordings, 10)
+  } = usePagination(sortedRecordings, 20)
 
   const selectableCurrentRecordings = useMemo(
     () => currentRecordings.filter(recording => !processedKeys.has(recording.key)),
@@ -384,10 +406,14 @@ export function useEnregistrementLogic() {
       const toDownload = currentRecordings.filter(recording => selectedRecordingIds.has(recording.id))
 
       for (const recording of toDownload) {
-        const url = recording.rawUrl || recording.url
-        if (url) {
-          RecordingService.downloadRecording(url, recording.filename)
-          await new Promise(resolve => setTimeout(resolve, 300))
+        try {
+          const url = recording.rawUrl || recording.url || await RecordingService.getStreamingUrl(recording.key)
+          if (url) {
+            RecordingService.downloadRecording(url, recording.filename)
+            await new Promise(resolve => setTimeout(resolve, 300))
+          }
+        } catch {
+          console.warn('Erreur téléchargement:', recording.filename)
         }
       }
 
@@ -553,13 +579,17 @@ export function useEnregistrementLogic() {
     }
   }, [selectedRecentIds, processedKeys, clearRecentSelection, showSuccess, showError])
 
-  const handleDownloadRecording = recording => {
-    const url = recording.url || recording.rawUrl
-    if (url) {
-      RecordingService.downloadRecording(url, recording.filename)
-      showSuccess(`Téléchargement de ${recording.filename} démarré`)
-    } else {
-      showError('URL de téléchargement non disponible')
+  const handleDownloadRecording = async recording => {
+    try {
+      const url = recording.url || recording.rawUrl || await RecordingService.getStreamingUrl(recording.key)
+      if (url) {
+        RecordingService.downloadRecording(url, recording.filename)
+        showSuccess(`Téléchargement de ${recording.filename} démarré`)
+      } else {
+        showError('URL de téléchargement non disponible')
+      }
+    } catch {
+      showError('Erreur lors de la génération du lien de téléchargement')
     }
   }
 
@@ -589,10 +619,10 @@ export function useEnregistrementLogic() {
     }
   }
 
-  const handleUserSelection = user => {
+  const handleUserSelection = useCallback(user => {
     setSelectedCommercialForRecordings(user)
     loadRecordingsForCommercial(user)
-  }
+  }, [loadRecordingsForCommercial])
 
   return {
     filteredUsers,

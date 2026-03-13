@@ -672,6 +672,55 @@ export class RecordingService {
     }
   }
 
+  async listAllRecordings(
+    roomNames: string[],
+    currentUser: { id: number; role: string },
+  ): Promise<{ items: RecordingItem[]; totalCount: number }> {
+    const uniqueRooms = [...new Set(roomNames)];
+
+    const results = await Promise.allSettled(
+      uniqueRooms.map(async (roomName) => {
+        await this.ensureRoomAccess(roomName, currentUser.id, currentUser.role);
+
+        const safe = this.safeRoom(roomName);
+        const prefix = `${this.prefix}${safe}/`;
+
+        const resp = await this.s3.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucket,
+            Prefix: prefix,
+          }),
+        );
+
+        const items: RecordingItem[] = [];
+        for (const obj of resp.Contents || []) {
+          if (!obj.Key) continue;
+          if (obj.Key.endsWith('_conv.mp4')) continue;
+          items.push({
+            key: obj.Key,
+            size: obj.Size,
+            lastModified: obj.LastModified,
+          });
+        }
+        return items;
+      }),
+    );
+
+    const allItems: RecordingItem[] = [];
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        allItems.push(...result.value);
+      }
+    }
+
+    allItems.sort(
+      (a, b) =>
+        (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0),
+    );
+
+    return { items: allItems, totalCount: allItems.length };
+  }
+
   getSpeechScores(
     keys: string[],
   ): Array<{

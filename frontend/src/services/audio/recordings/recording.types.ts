@@ -6,7 +6,7 @@ export interface RecordingData {
   key: string
   size: number
   lastModified: string
-  url: string
+  url?: string
 }
 
 export interface EnrichedRecording {

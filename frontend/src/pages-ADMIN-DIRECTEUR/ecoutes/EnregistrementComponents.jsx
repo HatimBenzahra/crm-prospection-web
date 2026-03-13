@@ -88,7 +88,7 @@ export function RecordingStatusBadge({ lastModified }) {
   return null
 }
 
-export function RecordingCard({ recording, onPlay, onDownload, isSelected, onToggleSelect, isProcessed, speechScore }) {
+export const RecordingCard = React.memo(function RecordingCard({ recording, onPlay, onDownload, isSelected, onToggleSelect, isProcessed, speechScore }) {
   return (
     <div
       className={`border rounded-xl p-3 hover:border-border hover:shadow-sm transition-all duration-200 cursor-pointer bg-card ${
@@ -171,7 +171,7 @@ export function RecordingCard({ recording, onPlay, onDownload, isSelected, onTog
       </div>
     </div>
   )
-}
+})
 
 export function SortableTableHeader({ label, sortKey, currentSort, onSort }) {
   const isActive = currentSort?.key === sortKey

@@ -506,6 +506,11 @@ type Offre {
   updatedAt: DateTime!
 }
 
+type PaginatedRecordingsResult {
+  items: [RecordingItem!]!
+  totalCount: Int!
+}
+
 type Porte {
   commentaire: String
   createdAt: DateTime!
@@ -569,6 +574,7 @@ type Query {
   getStreamingUrl(key: String!): String!
   immeuble(id: Int!): Immeuble!
   immeubles: [Immeuble!]!
+  listAllRecordings(roomNames: [String!]!): PaginatedRecordingsResult!
   listRecordings(roomName: String!): [RecordingItem!]!
   manager(id: Int!): Manager!
   managerBadges(managerId: Int!): [CommercialBadgeType!]!
