@@ -1,31 +1,44 @@
 import React from 'react'
 import ErrorFallback from './ErrorFallback'
 
+function isChunkLoadError(error) {
+  if (!error) return false
+  const msg = error.message || ''
+  return (
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Unable to preload CSS') ||
+    msg.includes('Loading chunk') ||
+    msg.includes('Loading CSS chunk') ||
+    error.name === 'ChunkLoadError'
+  )
+}
+
+const REFRESH_KEY = 'chunk_error_refresh'
+const REFRESH_COOLDOWN_MS = 10000
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
     this.state = { hasError: false, error: null, errorInfo: null }
   }
 
-  // eslint-disable-next-line no-unused-vars
   static getDerivedStateFromError(error) {
-    // Mettre à jour l'état pour que le prochain rendu affiche l'UI de secours
     return { hasError: true }
   }
 
   componentDidCatch(error, errorInfo) {
-    // Logger l'erreur dans la console
     console.error('ErrorBoundary caught an error:', error, errorInfo)
 
-    // Sauvegarder les détails de l'erreur dans l'état
-    this.setState({
-      error: error,
-      errorInfo: errorInfo,
-    })
+    if (isChunkLoadError(error)) {
+      const lastRefresh = Number(sessionStorage.getItem(REFRESH_KEY) || 0)
+      if (Date.now() - lastRefresh > REFRESH_COOLDOWN_MS) {
+        sessionStorage.setItem(REFRESH_KEY, String(Date.now()))
+        window.location.reload()
+        return
+      }
+    }
 
-    // Vous pouvez aussi envoyer l'erreur à un service de monitoring
-    // comme Sentry, LogRocket, etc.
-    // logErrorToService(error, errorInfo);
+    this.setState({ error, errorInfo })
   }
 
   resetErrorBoundary = () => {
@@ -34,7 +47,6 @@ class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
-      // Afficher la page d'erreur personnalisée
       return <ErrorFallback error={this.state.error} errorInfo={this.state.errorInfo} />
     }
 
