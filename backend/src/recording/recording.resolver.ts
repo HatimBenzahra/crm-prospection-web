@@ -1,5 +1,6 @@
 import { Resolver, Mutation, Args, Query } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
+import { Int } from '@nestjs/graphql';
 import {
   RecordingResult,
   StartRecordingInput,
@@ -10,6 +11,7 @@ import {
   RecordingUploadDetails,
   ConfirmRecordingUploadInput,
   ExtractionProgressDto,
+  ExtractionQueueItemDto,
 } from './recording.dto';
 import { RecordingService } from './recording.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -109,5 +111,28 @@ export class RecordingResolver {
     @CurrentUser() user: any,
   ): Promise<boolean> {
     return this.svc.triggerConversationExtraction(key, user);
+  }
+
+  @Mutation(() => Int)
+  @Roles('admin', 'directeur')
+  async triggerBatchExtraction(
+    @Args({ name: 'keys', type: () => [String] }) keys: string[],
+    @CurrentUser() user: any,
+  ): Promise<number> {
+    return this.svc.triggerBatchExtraction(keys, user);
+  }
+
+  @Query(() => [ExtractionQueueItemDto])
+  @Roles('admin', 'directeur')
+  getExtractionQueue(): ExtractionQueueItemDto[] {
+    return this.svc.getExtractionQueue();
+  }
+
+  @Query(() => [String])
+  @Roles('admin', 'directeur')
+  async getProcessedKeys(
+    @Args({ name: 'keys', type: () => [String] }) keys: string[],
+  ): Promise<string[]> {
+    return this.svc.getProcessedKeys(keys);
   }
 }

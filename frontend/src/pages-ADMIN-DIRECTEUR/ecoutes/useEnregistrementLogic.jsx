@@ -39,6 +39,10 @@ export function useEnregistrementLogic() {
   const [selectedRecordingIds, setSelectedRecordingIds] = useState(new Set())
   const [bulkDownloading, setBulkDownloading] = useState(false)
   const [currentModalRecordingIndex, setCurrentModalRecordingIndex] = useState(null)
+  const [extractionQueue, setExtractionQueue] = useState([])
+  const [extractionDrawerOpen, setExtractionDrawerOpen] = useState(false)
+  const [selectedRecentIds, setSelectedRecentIds] = useState(new Set())
+  const [processedKeys, setProcessedKeys] = useState(new Set())
 
   const statusFilterOptions = useMemo(
     () => [{ value: 'ALL', label: 'Tous' }, ...USER_STATUS_OPTIONS],
@@ -123,6 +127,18 @@ export function useEnregistrementLogic() {
       isActive = false
     }
   }, [allUsers])
+
+  useEffect(() => {
+    if (!recentRecordings.length) return
+    let active = true
+
+    const keys = recentRecordings.map(r => r.key)
+    RecordingService.getProcessedKeys(keys).then(processed => {
+      if (active) setProcessedKeys(processed)
+    })
+
+    return () => { active = false }
+  }, [recentRecordings])
 
   const handleSort = useCallback(key => {
     setSortConfig(prev => ({
@@ -233,7 +249,19 @@ export function useEnregistrementLogic() {
     hasPreviousPage,
   } = usePagination(sortedRecordings, 10)
 
-  const selectedCount = selectedRecordingIds.size
+  const selectableCurrentRecordings = useMemo(
+    () => currentRecordings.filter(recording => !processedKeys.has(recording.key)),
+    [currentRecordings, processedKeys]
+  )
+
+  const selectedCount = useMemo(
+    () =>
+      selectableCurrentRecordings.reduce(
+        (count, recording) => (selectedRecordingIds.has(recording.id) ? count + 1 : count),
+        0
+      ),
+    [selectableCurrentRecordings, selectedRecordingIds]
+  )
 
   const toggleRecordingSelection = useCallback(id => {
     setSelectedRecordingIds(prev => {
@@ -252,24 +280,59 @@ export function useEnregistrementLogic() {
   }, [])
 
   const toggleSelectAll = useCallback(() => {
-    const pageIds = currentRecordings.map(recording => recording.id)
-    const allCurrentSelected = pageIds.every(id => selectedRecordingIds.has(id))
+    const selectableIds = selectableCurrentRecordings.map(recording => recording.id)
+    if (!selectableIds.length) return
 
-    if (allCurrentSelected) {
-      clearSelection()
-      return
-    }
+    const allCurrentSelected = selectableIds.every(id => selectedRecordingIds.has(id))
 
     setSelectedRecordingIds(prev => {
       const next = new Set(prev)
-      pageIds.forEach(id => next.add(id))
+      if (allCurrentSelected) {
+        selectableIds.forEach(id => {
+          next.delete(id)
+        })
+      } else {
+        selectableIds.forEach(id => {
+          next.add(id)
+        })
+      }
       return next
     })
-  }, [currentRecordings, selectedRecordingIds, clearSelection])
+  }, [selectableCurrentRecordings, selectedRecordingIds])
 
   useEffect(() => {
-    clearSelection()
-  }, [selectedCommercialForRecordings, currentPage, clearSelection])
+    if (!selectedCommercialForRecordings && currentPage === 1) {
+      setSelectedRecordingIds(new Set())
+      return
+    }
+
+    setSelectedRecordingIds(new Set())
+  }, [selectedCommercialForRecordings, currentPage])
+
+  useEffect(() => {
+    setSelectedRecordingIds(prev => {
+      if (!prev.size) return prev
+
+      const selectableIds = new Set(
+        currentRecordings
+          .filter(recording => !processedKeys.has(recording.key))
+          .map(recording => recording.id)
+      )
+
+      let changed = false
+      const next = new Set()
+
+      prev.forEach(id => {
+        if (selectableIds.has(id)) {
+          next.add(id)
+        } else {
+          changed = true
+        }
+      })
+
+      return changed ? next : prev
+    })
+  }, [currentRecordings, processedKeys])
 
   const handleBulkDownload = useCallback(async () => {
     if (!selectedRecordingIds.size) return
@@ -336,6 +399,117 @@ export function useEnregistrementLogic() {
       setCurrentModalRecordingIndex(null)
     }
   }, [currentModalRecordingIndex, currentRecordings.length])
+
+  const hasActiveExtractions = extractionQueue.some(
+    item => item.step !== 'done' && item.step !== 'error'
+  )
+  const shouldPoll = extractionDrawerOpen || hasActiveExtractions
+
+  useEffect(() => {
+    if (!shouldPoll) return
+
+    let active = true
+    let timerId
+
+    const poll = async () => {
+      if (!active) return
+      try {
+        const queue = await RecordingService.getExtractionQueue()
+        if (active) setExtractionQueue(queue)
+      } catch (error) {
+        void error
+      }
+      if (active) timerId = setTimeout(poll, 2000)
+    }
+
+    timerId = setTimeout(poll, 2000)
+
+    return () => {
+      active = false
+      clearTimeout(timerId)
+    }
+  }, [shouldPoll])
+
+  const toggleRecentSelection = useCallback(id => {
+    setSelectedRecentIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const clearRecentSelection = useCallback(() => {
+    setSelectedRecentIds(new Set())
+  }, [])
+
+  useEffect(() => {
+    setSelectedRecentIds(prev => {
+      if (!prev.size) return prev
+
+      const selectableIds = new Set(
+        recentRecordings
+          .filter(recording => !processedKeys.has(recording.key))
+          .map(recording => recording.id)
+      )
+
+      let changed = false
+      const next = new Set()
+
+      prev.forEach(id => {
+        if (selectableIds.has(id)) {
+          next.add(id)
+        } else {
+          changed = true
+        }
+      })
+
+      return changed ? next : prev
+    })
+  }, [recentRecordings, processedKeys])
+
+  const handleBatchExtraction = useCallback(async () => {
+    if (!selectedRecordingIds.size) return
+
+    const keys = currentRecordings
+      .filter(r => selectedRecordingIds.has(r.id) && !processedKeys.has(r.key))
+      .map(r => r.key)
+
+    if (!keys.length) return
+
+    try {
+      await RecordingService.triggerBatchExtraction(keys)
+      setExtractionDrawerOpen(true)
+      const queue = await RecordingService.getExtractionQueue()
+      setExtractionQueue(queue)
+      showSuccess(`${keys.length} extraction(s) lancée(s)`)
+    } catch (err) {
+      console.error('Erreur batch extraction:', err)
+      showError("Erreur lors du lancement des extractions")
+    }
+  }, [selectedRecordingIds, currentRecordings, processedKeys, showSuccess, showError])
+
+  const handleRecentBatchExtraction = useCallback(async (recentRecordings) => {
+    if (!selectedRecentIds.size) return
+
+    const keys = recentRecordings
+      .filter(r => selectedRecentIds.has(r.id) && !processedKeys.has(r.key))
+      .map(r => r.key)
+
+    if (!keys.length) return
+
+    try {
+      await RecordingService.triggerBatchExtraction(keys)
+      setExtractionDrawerOpen(true)
+      clearRecentSelection()
+      const queue = await RecordingService.getExtractionQueue()
+      setExtractionQueue(queue)
+      showSuccess(`${keys.length} extraction(s) lancée(s)`)
+    } catch (err) {
+      console.error('Erreur batch extraction:', err)
+      showError("Erreur lors du lancement des extractions")
+    }
+  }, [selectedRecentIds, processedKeys, clearRecentSelection, showSuccess, showError])
 
   const handleDownloadRecording = recording => {
     const url = recording.url || recording.rawUrl
@@ -430,5 +604,14 @@ export function useEnregistrementLogic() {
     goToPreviousRecording,
     hasNextRecording,
     hasPreviousRecording,
+    extractionQueue,
+    extractionDrawerOpen,
+    setExtractionDrawerOpen,
+    handleBatchExtraction,
+    selectedRecentIds,
+    toggleRecentSelection,
+    clearRecentSelection,
+    handleRecentBatchExtraction,
+    processedKeys,
   }
 }

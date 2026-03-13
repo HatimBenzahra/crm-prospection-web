@@ -33,6 +33,7 @@ export interface ExtractionProgress {
   step: string;
   current: number;
   total: number;
+  key?: string;
 }
 
 @Injectable()
@@ -99,6 +100,12 @@ export class TranscriptionService implements OnModuleDestroy {
     setTimeout(() => this.progress.delete(s3Key), 10_000);
   }
 
+  private failProgress(s3Key: string): void {
+    // Keep "error" visible for 30s so the frontend can catch it
+    this.setProgress(s3Key, 'error', 0, 4);
+    setTimeout(() => this.progress.delete(s3Key), 30_000);
+  }
+
   private readonly region = process.env.AWS_REGION || 'eu-west-3';
   private readonly bucket = process.env.S3_BUCKET_NAME!;
 
@@ -113,7 +120,7 @@ export class TranscriptionService implements OnModuleDestroy {
   private resolveWhisperTimeout(): number {
     const raw = Number(process.env.WHISPER_TIMEOUT_MS);
     if (!Number.isFinite(raw) || raw < 10_000) {
-      return 120_000;
+      return 300_000;
     }
     return raw;
   }
@@ -125,14 +132,21 @@ export class TranscriptionService implements OnModuleDestroy {
    * Si le Whisper est down, ffmpeg échoue, S3 plante → on log et on return.
    * L'enregistrement original reste intact.
    */
+  getQueueState(): (ExtractionProgress & { key: string })[] {
+    return Array.from(this.progress.entries()).map(([key, p]) => ({
+      ...p,
+      key,
+    }));
+  }
+
   async processRecording(s3Key: string): Promise<void> {
     if (this.inFlight.has(s3Key)) {
       this.logger.debug(`Traitement déjà en cours pour ${s3Key}, skip`);
       return;
     }
 
-    // Mark immediately to prevent duplicate calls, then wait for a concurrency slot
     this.inFlight.add(s3Key);
+    this.setProgress(s3Key, 'queued', 0);
     await this.acquireSlot();
 
     const tmpDir = path.join(
@@ -160,46 +174,41 @@ export class TranscriptionService implements OnModuleDestroy {
       // 1. Créer le dossier temporaire
       fs.mkdirSync(tmpDir, { recursive: true });
 
-      // 2. Télécharger depuis S3 (streaming — pas de buffering mémoire)
       this.setProgress(s3Key, 'downloading', 1);
       const downloaded = await this.downloadFromS3(s3Key, originalFile);
       if (!downloaded) {
-        this.clearProgress(s3Key);
+        this.failProgress(s3Key);
         return;
       }
 
-      // 3. Envoyer à Whisper pour obtenir les segments
       this.setProgress(s3Key, 'transcribing', 2);
       const segments = await this.transcribe(originalFile);
       if (!segments || segments.length === 0) {
         this.logger.warn(
           `Aucun segment de parole détecté pour ${s3Key} — pas de version conversation`,
         );
-        this.clearProgress(s3Key);
+        this.failProgress(s3Key);
         return;
       }
 
-      // 4. Fusionner les segments proches (padding 2s) pour éviter les coupures
       const merged = this.mergeSegments(segments, 2.0);
 
       this.logger.log(
         `${segments.length} segments détectés → ${merged.length} blocs fusionnés pour ${s3Key}`,
       );
 
-      // 5. Découper avec ffmpeg
       this.setProgress(s3Key, 'cutting', 3);
       const cut = await this.cutAudio(originalFile, convFile, merged);
       if (!cut) {
-        this.clearProgress(s3Key);
+        this.failProgress(s3Key);
         return;
       }
 
-      // 6. Upload la version conversation vers S3 (streaming)
       this.setProgress(s3Key, 'uploading', 4);
       const convKey = s3Key.replace(/\.mp4$/i, '_conv.mp4');
       const uploaded = await this.uploadToS3(convFile, convKey);
       if (!uploaded) {
-        this.clearProgress(s3Key);
+        this.failProgress(s3Key);
         return;
       }
 
@@ -215,7 +224,7 @@ export class TranscriptionService implements OnModuleDestroy {
       this.logger.error(
         `Erreur inattendue lors du traitement de ${s3Key}: ${error?.message || error}`,
       );
-      this.clearProgress(s3Key);
+      this.failProgress(s3Key);
     } finally {
       // Nettoyage systématique des fichiers temporaires
       this.cleanupDir(tmpDir);

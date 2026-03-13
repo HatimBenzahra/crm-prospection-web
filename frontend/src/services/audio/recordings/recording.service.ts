@@ -66,6 +66,29 @@ const GET_EXTRACTION_PROGRESS = `
   }
 `
 
+const TRIGGER_BATCH_EXTRACTION = `
+  mutation TriggerBatchExtraction($keys: [String!]!) {
+    triggerBatchExtraction(keys: $keys)
+  }
+`
+
+const GET_EXTRACTION_QUEUE = `
+  query GetExtractionQueue {
+    getExtractionQueue {
+      key
+      step
+      current
+      total
+    }
+  }
+`
+
+const GET_PROCESSED_KEYS = `
+  query GetProcessedKeys($keys: [String!]!) {
+    getProcessedKeys(keys: $keys)
+  }
+`
+
 // Service pour la gestion des enregistrements
 export class RecordingService {
   /**
@@ -244,6 +267,29 @@ export class RecordingService {
       return data.getExtractionProgress || null
     } catch {
       return null
+    }
+  }
+
+  static async triggerBatchExtraction(keys: string[]): Promise<number> {
+    const data = await graphqlClient.request(TRIGGER_BATCH_EXTRACTION, { keys })
+    return data.triggerBatchExtraction
+  }
+
+  static async getExtractionQueue(): Promise<{ key: string; step: string; current: number; total: number }[]> {
+    try {
+      const data = await graphqlClient.request(GET_EXTRACTION_QUEUE)
+      return data.getExtractionQueue || []
+    } catch {
+      return []
+    }
+  }
+
+  static async getProcessedKeys(keys: string[]): Promise<Set<string>> {
+    try {
+      const data = await graphqlClient.request(GET_PROCESSED_KEYS, { keys })
+      return new Set(data.getProcessedKeys || [])
+    } catch {
+      return new Set()
     }
   }
 

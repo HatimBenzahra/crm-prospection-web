@@ -142,12 +142,21 @@ export default function RecordingDetailModal({
         if (progress) {
           setExtractionProgress(progress)
 
+          if (progress.step === 'error') {
+            setExtractionTriggered(false)
+            setExtractionProgress(null)
+            setExtractionError(true)
+            return
+          }
+
           if (progress.step === 'done') {
             const convUrl = await RecordingService.getConversationStreamingUrl(recording.key)
             if (!active) return
             if (convUrl) {
               setConversationUrl(convUrl)
               setShowConversationOnly(true)
+            } else {
+              setExtractionError(true)
             }
             setExtractionTriggered(false)
             setExtractionProgress(null)
@@ -282,11 +291,12 @@ export default function RecordingDetailModal({
               ) : extractionError ? (
                 <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-destructive/5 border border-destructive/10 animate-in fade-in duration-300">
                   <span className="text-xs text-muted-foreground">
-                    Extraction indisponible pour le moment.
+                    L'extraction a échoué. Le service de transcription est peut-être temporairement indisponible.
                   </span>
                   <button
+                    type="button"
                     onClick={handleExtractConversation}
-                    className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                    className="text-xs font-medium text-primary hover:text-primary/80 transition-colors shrink-0 ml-2"
                   >
                     Réessayer
                   </button>

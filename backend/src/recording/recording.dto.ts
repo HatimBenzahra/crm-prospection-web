@@ -84,3 +84,11 @@ export class ExtractionProgressDto {
   @Field(() => Int) current: number;
   @Field(() => Int) total: number;
 }
+
+@ObjectType()
+export class ExtractionQueueItemDto {
+  @Field() key: string;
+  @Field() step: string;
+  @Field(() => Int) current: number;
+  @Field(() => Int) total: number;
+}

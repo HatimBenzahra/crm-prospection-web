@@ -576,6 +576,63 @@ export class RecordingService {
     return this.transcription.getProgress(key);
   }
 
+  async triggerBatchExtraction(
+    keys: string[],
+    currentUser: { id: number; role: string },
+  ): Promise<number> {
+    let started = 0;
+
+    for (const key of keys) {
+      const roomName = this.extractRoomFromKey(key);
+      if (roomName) {
+        try {
+          await this.ensureRoomAccess(roomName, currentUser.id, currentUser.role);
+        } catch {
+          continue;
+        }
+      } else if (currentUser.role !== 'admin') {
+        continue;
+      }
+
+      if (this.transcription.isProcessing(key)) continue;
+
+      const convKey = key.replace(/\.mp4$/i, '_conv.mp4');
+      try {
+        await this.s3.send(
+          new HeadObjectCommand({ Bucket: this.bucket, Key: convKey }),
+        );
+        continue;
+      } catch {
+        // falls through — file doesn't exist yet
+      }
+
+      void this.transcription.processRecording(key);
+      started++;
+    }
+
+    return started;
+  }
+
+  getExtractionQueue(): { key: string; step: string; current: number; total: number }[] {
+    return this.transcription.getQueueState();
+  }
+
+  async getProcessedKeys(keys: string[]): Promise<string[]> {
+    const results = await Promise.allSettled(
+      keys.map(async (key) => {
+        const convKey = key.replace(/\.mp4$/i, '_conv.mp4');
+        await this.s3.send(
+          new HeadObjectCommand({ Bucket: this.bucket, Key: convKey }),
+        );
+        return key;
+      }),
+    );
+
+    return results
+      .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+      .map((r) => r.value);
+  }
+
   async getConversationStreamingUrl(
     key: string,
     currentUser: { id: number; role: string },

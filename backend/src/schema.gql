@@ -285,6 +285,13 @@ type ExtractionProgressDto {
   total: Int!
 }
 
+type ExtractionQueueItemDto {
+  current: Int!
+  key: String!
+  step: String!
+  total: Int!
+}
+
 type HistoriqueZone {
   assignedAt: DateTime!
   id: Int!
@@ -463,6 +470,7 @@ type Mutation {
   syncContrats: SyncContratsResult!
   syncManagerStats(managerId: Int!): String!
   syncOffres: SyncOffresResult!
+  triggerBatchExtraction(keys: [String!]!): Int!
   triggerConversationExtraction(key: String!): Boolean!
   unassignUser(userId: Int!, userType: UserType!): Boolean!
   unassignZoneFromCommercial(commercialId: Int!, zoneId: Int!): Boolean!
@@ -555,6 +563,8 @@ type Query {
   getActiveSessions: [MonitoringSession!]!
   getConversationStreamingUrl(key: String!): String
   getExtractionProgress(key: String!): ExtractionProgressDto
+  getExtractionQueue: [ExtractionQueueItemDto!]!
+  getProcessedKeys(keys: [String!]!): [String!]!
   getStreamingUrl(key: String!): String!
   immeuble(id: Int!): Immeuble!
   immeubles: [Immeuble!]!
