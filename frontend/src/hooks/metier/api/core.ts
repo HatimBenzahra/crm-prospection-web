@@ -3,8 +3,9 @@
  * Provides reusable hooks with loading states, error handling, and caching
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { apiCache, invalidateRelatedCaches, offlineQueue } from '../../../services/core'
+import { useState, useCallback, useRef } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { CACHE_INVALIDATION_MAP, offlineQueue } from '../../../services/core'
 
 // =============================================================================
 // Base Hook Types
@@ -41,54 +42,29 @@ export function useApiCall<T>(
   dependencies: any[] = [],
   namespace?: string
 ): UseApiState<T> & UseApiActions {
-  const [state, setState] = useState<UseApiState<T>>({
-    data: null,
-    loading: true,
-    error: null,
+  const queryKey = ['api', namespace || 'global', ...dependencies]
+
+  const query = useQuery({
+    queryKey,
+    queryFn: apiCall,
+    retry: 1,
   })
 
-  const fetchData = useCallback(async (forceRefresh = false) => {
-    const cacheKey = apiCache.getKey(apiCall, dependencies, namespace)
+  const refetch = useCallback(async () => {
+    await query.refetch()
+  }, [query])
 
-    if (forceRefresh) {
-      // Force refresh: bypass cache and in-flight
-      setState(prev => ({ ...prev, loading: true, error: null }))
-      try {
-        const data = await apiCall()
-        apiCache.set(cacheKey, data)
-        setState({ data, loading: false, error: null })
-      } catch (error) {
-        setState({
-          data: null,
-          loading: false,
-          error: error instanceof Error ? error.message : 'Unknown error occurred',
-        })
-      }
-      return
-    }
-
-    // Use fetchWithCache for deduplication and cache management
-    setState(prev => ({ ...prev, loading: true, error: null }))
-    try {
-      const data = await apiCache.fetchWithCache<T>(cacheKey, apiCall)
-      setState({ data, loading: false, error: null })
-    } catch (error) {
-      setState({
-        data: null,
-        loading: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-      })
-    }
-  }, dependencies)
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
-  const refetch = useCallback(() => fetchData(true), [fetchData])
+  const errorMessage =
+    query.error instanceof Error
+      ? query.error.message
+      : query.error
+        ? 'Unknown error occurred'
+        : null
 
   return {
-    ...state,
+    data: query.data ?? null,
+    loading: query.isPending || query.isFetching,
+    error: errorMessage,
     refetch,
   }
 }
@@ -104,7 +80,7 @@ export function useApiMutation<TInput, TOutput, TOptimistic = unknown>(
   entityType?: string,
   offlineType?: string // Type for offline queue
 ) {
-  const [loading, setLoading] = useState(false)
+  const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
 
   const callIdRef = useRef(0)
@@ -112,16 +88,10 @@ export function useApiMutation<TInput, TOutput, TOptimistic = unknown>(
   const mutationFnRef = useRef(mutationFn)
   mutationFnRef.current = mutationFn
 
-  // StrictMode-safe: re-set to true on every render so remount restores it
-  const mountedRef = useRef(true)
-  mountedRef.current = true
-
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false
-      abortRef.current?.abort()
-    }
-  }, [])
+  const mutation = useMutation({
+    mutationFn: async ({ input, signal }: { input: TInput; signal?: AbortSignal }) =>
+      mutationFnRef.current(input, signal),
+  })
 
   const mutate = useCallback(
     async (input: TInput, opts?: MutateOptions<TOutput, TOptimistic>): Promise<TOutput> => {
@@ -130,23 +100,14 @@ export function useApiMutation<TInput, TOutput, TOptimistic = unknown>(
       const controller = new AbortController()
       abortRef.current = controller
 
-      setLoading(true)
       setError(null)
 
-      // OFFLINE CHECK
       if (offlineType && !navigator.onLine) {
-         console.log('[useApiMutation] Offline detected, queuing action:', offlineType)
-         offlineQueue.enqueue(offlineType, input)
-         
-         // Simulate artificial delay for UX feel
-         await new Promise(r => setTimeout(r, 300))
-         
-         if (opts?.onSuccess) {
-            opts.onSuccess(input as unknown as TOutput)
-         }
-         
-         setLoading(false)
-         return input as unknown as TOutput
+        offlineQueue.enqueue(offlineType, input)
+
+        const optimisticResult = input as unknown as TOutput
+        opts?.onSuccess?.(optimisticResult)
+        return optimisticResult
       }
 
       let rollback: (() => void) | undefined
@@ -155,10 +116,23 @@ export function useApiMutation<TInput, TOutput, TOptimistic = unknown>(
           rollback = opts.optimisticUpdate()
         }
 
-        const result = await mutationFnRef.current(input, controller.signal)
+        const result = await mutation.mutateAsync({
+          input,
+          signal: controller.signal,
+        })
 
         if (entityType) {
-          await Promise.resolve(invalidateRelatedCaches(entityType))
+          const namespaces = CACHE_INVALIDATION_MAP[entityType] || [entityType]
+          await Promise.all(
+            namespaces.map(namespace =>
+              queryClient.invalidateQueries({
+                predicate: query =>
+                  Array.isArray(query.queryKey) &&
+                  query.queryKey[0] === 'api' &&
+                  query.queryKey[1] === namespace,
+              })
+            )
+          )
         }
 
         if (callIdRef.current === myId) {
@@ -166,12 +140,16 @@ export function useApiMutation<TInput, TOutput, TOptimistic = unknown>(
         }
 
         return result
-      } catch (err: unknown) {
+      } catch (err) {
         let message = 'Unknown error occurred'
-        if (typeof err === 'object' && err !== null) {
-          const anyErr = err as any
-          message = anyErr?.response?.data?.message ?? anyErr?.message ?? message
+        if (err instanceof Error) {
+          message = err.message
+        } else if (typeof err === 'object' && err !== null) {
+          if ('message' in err && typeof err.message === 'string') {
+            message = err.message
+          }
         }
+
         try {
           rollback?.()
         } catch {}
@@ -181,14 +159,10 @@ export function useApiMutation<TInput, TOutput, TOptimistic = unknown>(
           opts?.onError?.(message, err)
         }
         throw err
-      } finally {
-        if (callIdRef.current === myId) {
-          setLoading(false)
-        }
       }
     },
-    [entityType, offlineType]
+    [entityType, mutation, offlineType, queryClient]
   )
 
-  return { mutate, loading, error }
+  return { mutate, loading: mutation.isPending, error }
 }

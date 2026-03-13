@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { lazy, Suspense, useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -45,14 +45,15 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination'
-import AssignedZoneCard from './AssignedZoneCard'
+import { MapSkeleton } from '@/components/LoadingSkeletons'
 import { AdvancedDataTable } from './tableau'
 import { useEntityPermissions } from '@/hooks/metier/permissions/useRoleBasedData'
-import { useState, useMemo, useEffect } from 'react'
 import PortesProspectionChart from './charts/PortesProspectionChart'
 import PortesWeeklyChart from './charts/PortesWeeklyChart'
 import PortesStatusChart from './charts/PortesStatusChart'
 import PorteHistoriqueTimeline from '@/pages-ADMIN-DIRECTEUR/immeubles/components/PorteHistoriqueTimeline'
+
+const AssignedZoneCard = lazy(() => import('./AssignedZoneCard'))
 
 /**
  * Composant de tableau sans Card wrapper pour éviter les doubles cards
@@ -359,6 +360,7 @@ export default function DetailsPage({
   const navigate = useNavigate()
   const zonePermissions = useEntityPermissions('zones')
   const { setSections, focusedSection } = useDetailsSections()
+  const [showAssignedZoneMaps, setShowAssignedZoneMaps] = useState(false)
 
   // Créer un ID unique pour chaque section basé sur son titre
   const createSectionId = title => {
@@ -670,14 +672,31 @@ export default function DetailsPage({
           <Separator className="mb-6" />
           <div className="space-y-4">
             {assignedZones.length > 0 ? (
-              assignedZones.map(zone => (
-                <AssignedZoneCard
-                  key={zone.id}
-                  zone={zone}
-                  assignmentDate={zone.assignmentDate || zone.createdAt}
-                  immeublesCount={zone.immeublesCount || 0}
-                />
-              ))
+              showAssignedZoneMaps ? (
+                assignedZones.map(zone => (
+                  <Suspense key={zone.id} fallback={<MapSkeleton />}>
+                    <AssignedZoneCard
+                      zone={zone}
+                      assignmentDate={zone.assignmentDate || zone.createdAt}
+                      immeublesCount={zone.immeublesCount || 0}
+                    />
+                  </Suspense>
+                ))
+              ) : (
+                <Card className="border-2">
+                  <CardContent className="pt-6">
+                    <div className="flex flex-col items-center justify-center gap-3 py-6 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        Les cartes des zones sont chargees a la demande pour alleger la page.
+                      </p>
+                      <Button size="sm" className="gap-2" onClick={() => setShowAssignedZoneMaps(true)}>
+                        <MapPin className="h-4 w-4" />
+                        Afficher les cartes ({assignedZones.length})
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
             ) : (
               <Card className="border-2">
                 <CardContent className="pt-6">

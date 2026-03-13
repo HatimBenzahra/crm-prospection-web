@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { lazy, Suspense, useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { MapSkeleton } from '@/components/LoadingSkeletons'
 import { ChevronLeft, ChevronRight, MapPin, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import AssignedZoneCard from './AssignedZoneCard'
 import { useCommercials, useManagers, useDirecteurs } from '@/hooks/metier/use-api'
 import { Link } from "react-router-dom";
+
+const AssignedZoneCard = lazy(() => import('./AssignedZoneCard'))
 
 /**
  * Composant slider pour afficher les zones actuellement assignées avec carte Mapbox
@@ -24,6 +26,7 @@ export default function ActiveZonesSlider({
   isSliding = true,
 }) {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [showMap, setShowMap] = useState(false)
 
   // Charger les données utilisateurs pour enrichir les assignations
   const { data: commercials } = useCommercials()
@@ -157,12 +160,30 @@ export default function ActiveZonesSlider({
 
       {/* Carte de la zone actuelle */}
       {zone && (
-        <AssignedZoneCard
-          zone={zone}
-          assignmentDate={currentAssignment?.assignedAt || currentAssignment?.dateDebut}
-          fullWidth={true}
-          className="transition-all duration-300"
-        />
+        showMap ? (
+          <Suspense fallback={<MapSkeleton />}>
+            <AssignedZoneCard
+              zone={zone}
+              assignmentDate={currentAssignment?.assignedAt || currentAssignment?.dateDebut}
+              fullWidth={true}
+              className="transition-all duration-300"
+            />
+          </Suspense>
+        ) : (
+          <Card className="border-2">
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Carte masquee pour accelerer le chargement initial.
+                </p>
+                <Button onClick={() => setShowMap(true)} size="sm" className="gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Afficher la carte
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )
       )}
 
       {/* Navigation du slider */}
@@ -183,7 +204,8 @@ export default function ActiveZonesSlider({
               <div className="flex items-center gap-2">
                 {enrichedAssignments.map((assignment, index) => (
                   <button
-                    key={index}
+                    key={`${assignment.userType}-${assignment.userId}-${assignment?.zone?.id ?? 'zone'}`}
+                    type="button"
                     onClick={() => setCurrentIndex(index)}
                     className={cn(
                       'h-2 rounded-full transition-all',

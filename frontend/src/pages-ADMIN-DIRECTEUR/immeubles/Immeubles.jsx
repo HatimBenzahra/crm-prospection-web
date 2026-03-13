@@ -1,6 +1,6 @@
+import { lazy, Suspense } from 'react'
 import { AdvancedDataTable } from '@/components/tableau'
-import { TableSkeleton } from '@/components/LoadingSkeletons'
-import AssignedZoneCard from '@/components/AssignedZoneCard'
+import { MapSkeleton, TableSkeleton } from '@/components/LoadingSkeletons'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select'
 import {
   LayoutList,
-  Map,
+  Map as MapIcon,
   Info,
   Building,
   FileText,
@@ -24,6 +24,8 @@ import {
   User,
 } from 'lucide-react'
 import { useImmeublesLogic } from './useImmeublesLogic'
+
+const AssignedZoneCard = lazy(() => import('@/components/AssignedZoneCard'))
 
 export default function Immeubles() {
   const {
@@ -194,7 +196,7 @@ export default function Immeubles() {
             onClick={() => setViewMode('map')}
             className="gap-2"
           >
-            <Map className="h-4 w-4" />
+            <MapIcon className="h-4 w-4" />
             Vue Carte
           </Button>
         </div>
@@ -213,11 +215,13 @@ export default function Immeubles() {
           onDelete={permissions.canDelete ? handleDeleteImmeuble : undefined}
         />
       ) : (
-        <AssignedZoneCard
-          showAllImmeubles={true}
-          allImmeubles={filteredImmeubles}
-          fullWidth={true}
-        />
+        <Suspense fallback={<MapSkeleton />}>
+          <AssignedZoneCard
+            showAllImmeubles={true}
+            allImmeubles={filteredImmeubles}
+            fullWidth={true}
+          />
+        </Suspense>
       )}
     </div>
   )

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { offlineQueue } from '../services/core'
 import { api } from '../services/api'
-import { invalidateRelatedCaches } from '../services/core'
+import { CACHE_INVALIDATION_MAP } from '../services/core'
+import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/components/ui/toast'
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -14,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
  */
 export function OfflineSyncProvider({ children }) {
   const { toast } = useToast()
+  const queryClient = useQueryClient()
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [wasOffline, setWasOffline] = useState(false)
 
@@ -70,10 +72,20 @@ export function OfflineSyncProvider({ children }) {
           }
         }
 
-        // Invalidate caches
-        relatedEntities.forEach(entity => {
-           invalidateRelatedCaches(entity)
-        })
+        const namespacesToInvalidate = Array.from(relatedEntities).flatMap(
+          entity => CACHE_INVALIDATION_MAP[entity] || [entity]
+        )
+
+        await Promise.all(
+          namespacesToInvalidate.map(namespace =>
+            queryClient.invalidateQueries({
+              predicate: query =>
+                Array.isArray(query.queryKey) &&
+                query.queryKey[0] === 'api' &&
+                query.queryKey[1] === namespace,
+            })
+          )
+        )
 
         // Notify result
         if (successCount > 0) {
@@ -127,7 +139,7 @@ export function OfflineSyncProvider({ children }) {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
-  }, [toast])
+  }, [queryClient, toast])
 
   return (
     <>

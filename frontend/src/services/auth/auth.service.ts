@@ -94,6 +94,7 @@ export class AuthService {
     const refreshToken = this.getRefreshToken()
     if (!refreshToken) return null
 
+    this._isRefreshing = true
     try {
       const data = await graphqlClient.request<{ refreshToken: AuthResponse }>(
         REFRESH_TOKEN_MUTATION,
@@ -106,8 +107,9 @@ export class AuthService {
       return authResponse
     } catch (error) {
       console.error('Refresh token failed:', error)
-      this.logout()
       return null
+    } finally {
+      this._isRefreshing = false
     }
   }
 
@@ -224,6 +226,11 @@ export class AuthService {
   }
 
   private refreshTimerId: ReturnType<typeof setTimeout> | null = null
+  private _isRefreshing = false
+
+  get isRefreshing(): boolean {
+    return this._isRefreshing
+  }
 
   private storeAuthData(authResponse: AuthResponse): void {
     localStorage.setItem('access_token', authResponse.access_token)
@@ -267,23 +274,31 @@ export class AuthService {
   private scheduleTokenRefresh(expiresInSeconds: number): void {
     this.cancelScheduledRefresh()
 
-    // Refresh a 80% de la duree de vie, minimum 30s avant expiration
+    // Refresh at 50% of TTL for more buffer, minimum 60s before expiration
     const refreshAfterMs = Math.max(
-      (expiresInSeconds * 0.8) * 1000,
-      (expiresInSeconds - 30) * 1000
+      (expiresInSeconds * 0.5) * 1000,
+      (expiresInSeconds - 60) * 1000
     )
 
     if (refreshAfterMs <= 0) return
 
     this.refreshTimerId = setTimeout(async () => {
-      try {
+      // Retry every 30s for up to 5 minutes before giving up
+      const MAX_RETRIES = 10
+      const RETRY_INTERVAL_MS = 30_000
+
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         const result = await this.refreshToken()
-        if (!result) {
-          window.dispatchEvent(new Event('auth-unauthorized'))
+        if (result) return
+
+        if (!this.getRefreshToken()) break
+
+        if (attempt < MAX_RETRIES - 1) {
+          await new Promise<void>(r => setTimeout(r, RETRY_INTERVAL_MS))
         }
-      } catch {
-        window.dispatchEvent(new Event('auth-unauthorized'))
       }
+
+      window.dispatchEvent(new Event('auth-unauthorized'))
     }, refreshAfterMs)
   }
 

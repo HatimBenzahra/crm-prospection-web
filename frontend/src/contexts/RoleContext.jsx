@@ -8,7 +8,7 @@ import { ROLES } from '../hooks/metier/permissions/roleFilters'
 import { RoleContext } from './userole'
 import { authService } from '../services/auth'
 import { api } from '../services/api'
-import { apiCache } from '../services/core'
+import { clearAllAppStorage } from '../services/core'
 import LoadingScreen from '../components/LoadingScreen'
 import { useAppLoading } from './AppLoadingContext'
 import { setUser as setSentryUser } from '../config/sentry'
@@ -20,6 +20,7 @@ export const RoleProvider = ({ children }) => {
 
   // État de chargement initial
   const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [hasCompletedInitialLoading, setHasCompletedInitialLoading] = useState(false)
 
   // userId sera chargé depuis l'API via api.auth.getMe()
   const [currentRole, setCurrentRole] = useState(() => authService.getUserRole())
@@ -36,52 +37,29 @@ export const RoleProvider = ({ children }) => {
     }
   }, [currentUserId, currentRole])
 
-  // Vérifier l'authentification au montage
+  useEffect(() => {
+    if (!isInitialLoading && !hasCompletedInitialLoading) {
+      setHasCompletedInitialLoading(true)
+    }
+  }, [isInitialLoading, hasCompletedInitialLoading])
+
   useEffect(() => {
     const publicRoutes = ['/login', '/unauthorized']
     const isPublicRoute = publicRoutes.some(route => location.pathname.startsWith(route))
 
-    // Si on n'est pas sur une route publique et pas authentifié, rediriger vers login
     if (!isPublicRoute && !authService.isAuthenticated()) {
       navigate('/login', { replace: true })
       setIsInitialLoading(false)
     } else if (isPublicRoute) {
-      // Sur les routes publiques, pas de loading
+      setIsInitialLoading(false)
+    } else if (isAppReady) {
       setIsInitialLoading(false)
     } else {
-      // Pour les routes protégées, attendre OBLIGATOIREMENT que les données soient chargées
-      let minDelayPassed = false
-
-      const checkAllReady = () => {
-        // On cache le loading SEULEMENT si le délai minimum est passé ET les données sont chargées
-        if (minDelayPassed && isAppReady) {
-          setIsInitialLoading(false)
-        }
-      }
-
-      // Délai minimum pour l'animation (1.5s)
-      const minTimer = setTimeout(() => {
-        minDelayPassed = true
-        checkAllReady()
-      }, 1500)
-
-      // Vérifier périodiquement si les données sont prêtes
-      const checkInterval = setInterval(() => {
-        if (isAppReady && minDelayPassed) {
-          checkAllReady()
-        }
-      }, 100)
-
-      // Timeout de sécurité après 8 secondes max
       const maxTimer = setTimeout(() => {
         setIsInitialLoading(false)
-      }, 8000)
+      }, 3000)
 
-      return () => {
-        clearTimeout(minTimer)
-        clearTimeout(maxTimer)
-        clearInterval(checkInterval)
-      }
+      return () => clearTimeout(maxTimer)
     }
   }, [navigate, location, isAppReady])
 
@@ -116,41 +94,17 @@ export const RoleProvider = ({ children }) => {
         setIsAuthenticated(false)
       }
 
-      // Nettoyer les anciens timers
-      authChangeTimers.forEach(timer => clearTimeout(timer))
+      for (const timer of authChangeTimers) {
+        clearTimeout(timer)
+      }
       authChangeTimers = []
 
-      // Afficher le loading screen lors du changement d'auth
       setIsInitialLoading(true)
 
-      // Attendre le rechargement de la page
-      let isPageReady = false
-      let minDelayPassed = false
-
-      const minTimer = setTimeout(() => {
-        minDelayPassed = true
-        if (isPageReady) {
-          setIsInitialLoading(false)
-        }
-      }, 2000)
-      authChangeTimers.push(minTimer)
-
-      const checkReady = () => {
-        if (document.readyState === 'complete') {
-          isPageReady = true
-          if (minDelayPassed) {
-            setIsInitialLoading(false)
-          }
-        }
-      }
-
-      const checkTimer = setTimeout(checkReady, 100)
-      authChangeTimers.push(checkTimer)
-
-      const maxTimer = setTimeout(() => {
+      const readyTimer = setTimeout(() => {
         setIsInitialLoading(false)
-      }, 5000)
-      authChangeTimers.push(maxTimer)
+      }, 300)
+      authChangeTimers.push(readyTimer)
     }
 
     // Écouter les changements de storage (entre onglets)
@@ -162,8 +116,9 @@ export const RoleProvider = ({ children }) => {
     return () => {
       window.removeEventListener('storage', handleAuthChange)
       window.removeEventListener('auth-changed', handleAuthChange)
-      // Nettoyer les timers restants
-      authChangeTimers.forEach(timer => clearTimeout(timer))
+      for (const timer of authChangeTimers) {
+        clearTimeout(timer)
+      }
     }
   }, [])
 
@@ -171,8 +126,7 @@ export const RoleProvider = ({ children }) => {
     // Nettoyer les tokens et données d'authentification
     authService.logout()
 
-    // Nettoyer tout le cache API pour éviter les fuites de données
-    apiCache.clear()
+    clearAllAppStorage()
 
     // Réinitialiser les états locaux
     setCurrentRole(null)
@@ -201,14 +155,14 @@ export const RoleProvider = ({ children }) => {
     [currentRole, currentUserId, logout, isAuthenticated]
   )
 
-  // Vérifier périodiquement l'état d'authentification pour détecter l'expiration du token
   useEffect(() => {
     const checkAuthStatus = () => {
+      if (authService.isRefreshing) return
+
       const currentlyAuthenticated = authService.isAuthenticated()
       if (currentlyAuthenticated !== isAuthenticated) {
         setIsAuthenticated(currentlyAuthenticated)
         if (!currentlyAuthenticated) {
-          // Si le token vient d'expirer, nettoyer les états
           setCurrentRole(null)
           setCurrentUserId(null)
           setSentryUser(null)
@@ -216,21 +170,19 @@ export const RoleProvider = ({ children }) => {
       }
     }
 
-    // Écouter les erreurs 401 pour mettre à jour immédiatement
     const handleUnauthorized = () => {
+      if (authService.isRefreshing) return
+
       setIsAuthenticated(false)
       setCurrentRole(null)
       setCurrentUserId(null)
       setSentryUser(null)
     }
 
-    // Vérifier immédiatement
     checkAuthStatus()
 
-    // Vérifier toutes les 2 secondes pour détecter rapidement l'expiration
-    const interval = setInterval(checkAuthStatus, 2000)
+    const interval = setInterval(checkAuthStatus, 30_000)
 
-    // Écouter les événements d'erreur 401
     window.addEventListener('auth-unauthorized', handleUnauthorized)
 
     return () => {
@@ -271,7 +223,9 @@ export const RoleProvider = ({ children }) => {
     <RoleContext.Provider value={value}>
       {children}
       {/* LoadingScreen par-dessus tout pendant le chargement initial */}
-      {isInitialLoading && authService.isAuthenticated() && <LoadingScreen />}
+      {!hasCompletedInitialLoading && isInitialLoading && authService.isAuthenticated() && (
+        <LoadingScreen />
+      )}
     </RoleContext.Provider>
   )
 }

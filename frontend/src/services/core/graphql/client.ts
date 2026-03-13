@@ -77,12 +77,12 @@ export class GraphQLClient {
   async request<TData = any, TVariables = Record<string, any>>(
     query: string,
     variables?: TVariables,
-    headers?: Record<string, string>
+    headers?: Record<string, string>,
+    _isRetryAfterRefresh = false
   ): Promise<TData> {
     const requestHeaders = { ...this.defaultHeaders, ...headers }
 
     try {
-      // Attempt fetch request
       const response = await fetch(this.endpoint, {
         method: 'POST',
         headers: requestHeaders,
@@ -92,52 +92,71 @@ export class GraphQLClient {
         }),
       })
 
-      // Handle HTTP errors
       if (!response.ok) {
         const error = errorHandler.handleHttpError(response.status, response.statusText)
-        
-        // Si c'est une erreur 401 (non authentifié), déclencher un événement
+
+        if (response.status === 401 && !_isRetryAfterRefresh) {
+          const refreshed = await this.tryRefreshAndRetry<TData, TVariables>(query, variables)
+          if (refreshed !== null) return refreshed
+        }
+
         if (response.status === 401) {
           window.dispatchEvent(new Event('auth-unauthorized'))
         }
-        
+
         throw error
       }
 
-      // Parse JSON response
       const result: GraphQLResponse<TData> = await response.json()
 
-      // Handle GraphQL errors
       if (result.errors && result.errors.length > 0) {
         const error = errorHandler.handleGraphQLErrors(result.errors)
-        
-        // Si c'est une erreur d'authentification, déclencher un événement
-        if (error.errorType === ErrorType.AUTHENTICATION) {
+
+        if (error.type === ErrorType.AUTHENTICATION && !_isRetryAfterRefresh) {
+          const refreshed = await this.tryRefreshAndRetry<TData, TVariables>(query, variables)
+          if (refreshed !== null) return refreshed
+        }
+
+        if (error.type === ErrorType.AUTHENTICATION) {
           window.dispatchEvent(new Event('auth-unauthorized'))
         }
-        
+
         throw error
       }
 
-      // Validate data presence
       if (!result.data) {
         throw new GraphQLClientError('Aucune donnée retournée par le serveur', ErrorType.SERVER)
       }
 
       return result.data
     } catch (error) {
-      // Centralized error processing
       if (error instanceof GraphQLClientError) {
         throw error
       }
 
-      // Handle network/fetch errors
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw errorHandler.handleNetworkError(error)
       }
 
-      // Handle all other errors
       throw errorHandler.process(error)
+    }
+  }
+
+  private async tryRefreshAndRetry<TData, TVariables>(
+    query: string,
+    variables?: TVariables
+  ): Promise<TData | null> {
+    try {
+      const { authService } = await import('../../auth')
+      if (authService.isRefreshing) return null
+
+      const refreshed = await authService.refreshToken()
+      if (!refreshed) return null
+
+      const retryHeaders = { ...this.defaultHeaders, Authorization: `Bearer ${refreshed.access_token}` }
+      return await this.request<TData, TVariables>(query, variables, retryHeaders, true)
+    } catch {
+      return null
     }
   }
 

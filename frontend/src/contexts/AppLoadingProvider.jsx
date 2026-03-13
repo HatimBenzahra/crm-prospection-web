@@ -1,28 +1,18 @@
 import { useState, useEffect } from 'react'
 import { AppLoadingContext } from './AppLoadingContext'
-import { apiCache } from '../services/core'
 
 export function AppLoadingProvider({ children }) {
   const [isAppReady, setIsAppReady] = useState(false)
   const [hasCheckedCache, setHasCheckedCache] = useState(false)
 
-  // Vérifier si des données sont déjà en cache au montage
   useEffect(() => {
     const checkCache = () => {
-      // Vérifier si les données critiques sont en cache
-      const hasCachedData =
-        apiCache.has('commercials') || apiCache.has('managers') || apiCache.has('directeurs')
-
-      if (hasCachedData) {
-        // Si des données sont en cache, l'app peut être considérée comme prête plus rapidement
-        setIsAppReady(true)
-      }
+      setIsAppReady(true)
 
       setHasCheckedCache(true)
     }
 
-    // Petit délai pour laisser le temps au cache de se charger
-    const timer = setTimeout(checkCache, 100)
+    const timer = setTimeout(checkCache, 50)
     return () => clearTimeout(timer)
   }, [])
 

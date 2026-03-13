@@ -1,7 +1,10 @@
+import { lazy, Suspense } from 'react'
 import { AdvancedDataTable } from '@/components/tableau'
-import { ZoneCreatorModal } from '@/components/ZoneCreatorModal'
+import { MapSkeleton } from '@/components/LoadingSkeletons'
 import { ActionConfirmation } from '@/components/ActionConfirmation'
 import { useZonesLogic } from './useZonesLogic'
+
+const ZoneCreatorModal = lazy(() => import('@/components/ZoneCreatorModal'))
 
 export default function Zones() {
   const {
@@ -45,15 +48,23 @@ export default function Zones() {
       />
 
       {showZoneModal && (
-        <ZoneCreatorModal
-          onValidate={handleZoneValidate}
-          onClose={handleCloseModal}
-          existingZones={zonesData}
-          zoneToEdit={editingZone}
-          userRole={currentRole}
-          assignableUsers={assignableUsers}
-          isSubmitting={isSubmittingZone}
-        />
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-[100] bg-background/40 backdrop-blur-sm">
+              <MapSkeleton />
+            </div>
+          }
+        >
+          <ZoneCreatorModal
+            onValidate={handleZoneValidate}
+            onClose={handleCloseModal}
+            existingZones={zonesData}
+            zoneToEdit={editingZone}
+            userRole={currentRole}
+            assignableUsers={assignableUsers}
+            isSubmitting={isSubmittingZone}
+          />
+        </Suspense>
       )}
 
       <ActionConfirmation

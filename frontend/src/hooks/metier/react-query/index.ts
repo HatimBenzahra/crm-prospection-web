@@ -6,7 +6,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/services/api'
 import { useErrorToast } from '@/hooks/utils/ui/use-error-toast'
-import { invalidateRelatedCaches } from '@/services/core'
 import type {
   Manager,
   Commercial,
@@ -19,9 +18,9 @@ import type {
 // =============================================================================
 
 const queryKeys = {
-  directeurs: () => ['directeurs'] as const,
-  managers: () => ['managers'] as const,
-  commercials: () => ['commercials'] as const,
+  directeurs: () => ['api', 'directeurs'] as const,
+  managers: () => ['api', 'managers'] as const,
+  commercials: () => ['api', 'commercials'] as const,
 }
 
 // =============================================================================
@@ -56,13 +55,13 @@ export function useUpdateManagerMutation() {
     mutationFn: (input: UpdateManagerInput) => api.managers.update(input),
     onMutate: async variables => {
       // Annuler les refetch en cours
-      await queryClient.cancelQueries({ queryKey: ['managers'] })
+      await queryClient.cancelQueries({ queryKey: queryKeys.managers() })
 
       // Snapshot de l'état actuel pour rollback
-      const previousManagers = queryClient.getQueriesData({ queryKey: ['managers'] })
+      const previousManagers = queryClient.getQueriesData({ queryKey: queryKeys.managers() })
 
       // Mise à jour optimiste - met à jour le cache immédiatement
-      queryClient.setQueriesData<Manager[]>({ queryKey: ['managers'] }, old => {
+      queryClient.setQueriesData<Manager[]>({ queryKey: queryKeys.managers() }, old => {
         if (!old) return old
         return old.map(manager => {
           if (manager.id === variables.id) {
@@ -93,10 +92,7 @@ export function useUpdateManagerMutation() {
       showError(error, 'useUpdateManagerMutation')
     },
     onSettled: () => {
-      // Invalider AUSSI l'ancien cache pour compatibilité avec les anciens hooks
-      invalidateRelatedCaches('managers')
-      // Rafraîchir les données React Query après la mutation
-      queryClient.invalidateQueries({ queryKey: ['managers'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.managers() })
     },
   })
 }
@@ -121,13 +117,13 @@ export function useUpdateCommercialMutation() {
     mutationFn: (input: UpdateCommercialInput) => api.commercials.update(input),
     onMutate: async variables => {
       // Annuler les refetch en cours
-      await queryClient.cancelQueries({ queryKey: ['commercials'] })
+      await queryClient.cancelQueries({ queryKey: queryKeys.commercials() })
 
       // Snapshot de l'état actuel pour rollback
-      const previousCommercials = queryClient.getQueriesData({ queryKey: ['commercials'] })
+      const previousCommercials = queryClient.getQueriesData({ queryKey: queryKeys.commercials() })
 
       // Mise à jour optimiste - met à jour le cache immédiatement
-      queryClient.setQueriesData<Commercial[]>({ queryKey: ['commercials'] }, old => {
+      queryClient.setQueriesData<Commercial[]>({ queryKey: queryKeys.commercials() }, old => {
         if (!old) return old
         return old.map(commercial => {
           if (commercial.id === variables.id) {
@@ -154,10 +150,7 @@ export function useUpdateCommercialMutation() {
       showError(error, 'useUpdateCommercialMutation')
     },
     onSettled: () => {
-      // Invalider AUSSI l'ancien cache pour compatibilité avec les anciens hooks
-      invalidateRelatedCaches('commercials')
-      // Rafraîchir les données React Query après la mutation
-      queryClient.invalidateQueries({ queryKey: ['commercials'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.commercials() })
     },
   })
 }

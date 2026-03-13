@@ -28,20 +28,72 @@ export default defineConfig({
     minify: 'esbuild', // Faster than terser
     cssMinify: true,
     sourcemap: false, // Disable in production for smaller bundles
+    modulePreload: {
+      resolveDependencies(filename, deps, context) {
+        if (context.hostType === 'html') {
+          return deps.filter(dep => !dep.includes('vendor-mapbox'))
+        }
+        return deps
+      },
+    },
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Vendor chunks
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-select',
-            '@radix-ui/react-tooltip',
-          ],
-          'query-vendor': ['@tanstack/react-query'],
-          'mapbox-vendor': ['mapbox-gl', 'react-map-gl/mapbox', '@mapbox/mapbox-gl-geocoder'],
-          'chart-vendor': ['recharts'],
+        manualChunks(id) {
+          if (id.includes('node_modules/mapbox-gl') || id.includes('node_modules/@mapbox/')) {
+            return 'vendor-mapbox'
+          }
+
+          if (id.includes('node_modules/react-map-gl')) {
+            return 'vendor-mapbox-react'
+          }
+
+          if (id.includes('node_modules/livekit-client') || id.includes('node_modules/@livekit/')) {
+            return 'vendor-livekit'
+          }
+
+          if (id.includes('node_modules/recharts')) {
+            return 'vendor-recharts'
+          }
+
+          if (id.includes('node_modules/@tanstack/react-query')) {
+            return 'vendor-react-query'
+          }
+
+          if (id.includes('node_modules/@radix-ui/')) {
+            return 'vendor-radix'
+          }
+
+          if (
+            id.includes('node_modules/react') ||
+            id.includes('node_modules/react-dom') ||
+            id.includes('node_modules/react-router-dom')
+          ) {
+            return 'vendor-react-core'
+          }
+
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-lucide'
+          }
+
+          if (id.includes('node_modules/wavesurfer.js') || id.includes('node_modules/fft.js')) {
+            return 'vendor-audio'
+          }
+
+          if (id.includes('node_modules/@dnd-kit/')) {
+            return 'vendor-dnd-kit'
+          }
+
+          if (id.includes('node_modules/tailwind-merge')) {
+            return 'vendor-tailwind'
+          }
+
+          if (id.includes('node_modules/@sentry/')) {
+            return 'vendor-sentry'
+          }
+
+          if (id.includes('node_modules')) {
+            return 'vendor-misc'
+          }
         },
         // Optimize chunk file names
         chunkFileNames: 'assets/js/[name]-[hash].js',
@@ -54,6 +106,6 @@ export default defineConfig({
   },
   // Optimize dependencies
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', 'react-map-gl/mapbox'],
+    include: ['react', 'react-dom', 'react-router-dom'],
   },
 })

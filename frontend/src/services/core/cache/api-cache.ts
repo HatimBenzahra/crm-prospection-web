@@ -3,11 +3,12 @@
  * Provides intelligent caching for all API calls with automatic invalidation
  */
 
+import { offlineQueue } from '../offline'
+
 interface CacheEntry<T> {
   data: T
   timestamp: number
   ttl: number
-  accessCount: number // NEW: Pour LRU amélioré
 }
 
 interface CacheConfig {
@@ -122,7 +123,9 @@ class APICache {
       }
     })
 
-    keysToDelete.forEach(key => this.cache.delete(key))
+    for (const key of keysToDelete) {
+      this.cache.delete(key)
+    }
 
     if (keysToDelete.length > 0) {
       this.debugLog('Cleaned up expired entries:', keysToDelete.length)
@@ -283,13 +286,9 @@ class APICache {
     return Date.now() - entry.timestamp < entry.ttl
   }
 
-  /**
-   * Implement LRU: move accessed item to end (most recent) + track access count
-   */
   private markAsRecent(key: string): void {
     const entry = this.cache.get(key)
     if (entry) {
-      entry.accessCount++
       this.cache.delete(key)
       this.cache.set(key, entry)
     }
@@ -383,25 +382,12 @@ class APICache {
    * Store data in cache
    */
   set<T>(key: string, data: T, customTTL?: number): void {
-    // LRU eviction: remove least accessed entries if cache is full
     while (this.cache.size >= this.config.maxSize) {
-      // Find entry with lowest access count
-      let minAccessCount = Infinity
-      let oldestKey: string | null = null
-
-      for (const [k, entry] of this.cache.entries()) {
-        if (entry.accessCount < minAccessCount) {
-          minAccessCount = entry.accessCount
-          oldestKey = k
-        }
-      }
-
-      if (oldestKey) {
-        this.cache.delete(oldestKey)
-      } else {
-        // Fallback to simple oldest (first in map)
-        const firstKey = this.cache.keys().next().value
+      const firstKey = this.cache.keys().next().value
+      if (firstKey !== undefined) {
         this.cache.delete(firstKey)
+      } else {
+        break
       }
     }
 
@@ -413,7 +399,6 @@ class APICache {
       data,
       timestamp: Date.now(),
       ttl,
-      accessCount: 0,
     })
 
     this.debugLog('💾 Cache set:', key, 'TTL:', `${Math.round(ttl / 1000)}s`)
@@ -450,7 +435,9 @@ class APICache {
       }
     })
 
-    keysToDelete.forEach(key => this.cache.delete(key))
+    for (const key of keysToDelete) {
+      this.cache.delete(key)
+    }
 
     if (keysToDelete.length > 0) {
       this.scheduleSave()
@@ -475,7 +462,9 @@ class APICache {
       }
     })
 
-    keysToDelete.forEach(key => this.cache.delete(key))
+    for (const key of keysToDelete) {
+      this.cache.delete(key)
+    }
 
     if (keysToDelete.length > 0) {
       this.scheduleSave()
@@ -550,28 +539,19 @@ class APICache {
   }
 }
 
-// Global cache instance for business data
-export const apiCache = new APICache({
-  defaultTTL: 3 * 60 * 1000, // 3 minutes
-  maxSize: 150, // Optimized for business API calls
-  enableDebug: import.meta.env.DEV,
-  persistToStorage: true,
-})
-
 // Dedicated cache instance for Mapbox geocoding
 // Separate cache to avoid evicting business data
 export const mapboxCache = new APICache({
-  defaultTTL: 30 * 24 * 60 * 60_000, // 30 days - geocoding data never changes
-  maxSize: 500, // Large cache for coordinates (can have many unique locations)
+  defaultTTL: 7 * 24 * 60 * 60_000, // 7 days - geocoding data rarely changes
+  maxSize: 200, // Capped to avoid sessionStorage bloat
   enableDebug: import.meta.env.DEV,
   persistToStorage: true,
-  storageKey: 'mapbox-cache-v1', // Separate storage key for Mapbox cache
+  storageKey: 'mapbox-cache-v2', // Bumped version to reset oversized v1 cache
 })
 
 // Clean up on page unload
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
-    apiCache.destroy()
     mapboxCache.destroy()
   })
 }
@@ -591,26 +571,24 @@ export const CACHE_INVALIDATION_MAP: Record<string, string[]> = {
   statistics: ['statistics'],
 }
 
+
+
 /**
- * Invalidate related caches when an entity is modified
+ * Prefixes that accumulate per-entity in localStorage.
+ * Must match the patterns used in usePortesLogic.js and PortesListe.jsx.
  */
-export function invalidateRelatedCaches(entityType: string): void {
-  const toInvalidate = CACHE_INVALIDATION_MAP[entityType] || [entityType]
+const PER_ENTITY_PREFIXES = ['viewMode-', 'filters-']
 
-  toInvalidate.forEach(namespace => {
-    apiCache.invalidateNamespace(namespace)
-  })
+export function clearAllAppStorage(): void {
+  mapboxCache.clear()
+  offlineQueue.clear()
 
-  if (apiCache.isDebugEnabled()) {
-    console.log(`🔄 Invalidated caches for: ${entityType} → [${toInvalidate.join(', ')}]`)
+  for (const prefix of PER_ENTITY_PREFIXES) {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i)
+      if (key?.startsWith(prefix)) {
+        localStorage.removeItem(key)
+      }
+    }
   }
 }
-
-/**
- * Set current user for cache scoping
- */
-export function setCacheUser(userId: string | null): void {
-  apiCache.setUserId(userId)
-}
-
-export default apiCache

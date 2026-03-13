@@ -6,7 +6,6 @@ import { useRole } from '@/contexts/userole'
 import { DetailsSectionsProvider } from '@/contexts/DetailsSectionsProvider'
 import { AppLoadingProvider } from '@/contexts/AppLoadingProvider'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import LoadingScreen from '@/components/LoadingScreen'
 import SessionManager from '@/components/SessionManager'
 import { OfflineSyncProvider } from '@/components/OfflineSyncProvider'
 
@@ -138,7 +137,7 @@ function AdminLayout() {
               </div>
             </header>
             <div className="flex flex-1 flex-col gap-4 p-6 pt-6 overflow-x-hidden mx-auto w-11/12 max-w-[1400px]">
-              <Suspense fallback={<LoadingScreen />}>
+              <Suspense fallback={null}>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/commerciaux" element={<Commerciaux />} />
@@ -174,7 +173,7 @@ function CommercialLayout() {
   return (
     <ErrorBoundary>
       <div className="light" data-theme="light">
-        <Suspense fallback={<LoadingScreen />}>
+        <Suspense fallback={null}>
           <Routes>
             {/* Toutes les routes sous CommercialLayout pour éviter les déconnexions LiveKit */}
             <Route element={<CommercialLayoutComponent />}>
@@ -222,7 +221,7 @@ function App() {
           <RoleProvider>
             <SessionManager />
             <OfflineSyncProvider>
-              <Suspense fallback={<LoadingScreen />}>
+              <Suspense fallback={null}>
                 <Routes>
                   {/* Routes publiques */}
                   <Route path="/login" element={<Login />} />

@@ -3,6 +3,9 @@
  * Handles queueing and persistence of offline actions
  */
 
+const MAX_QUEUE_SIZE = 50
+const ACTION_TTL_MS = 24 * 60 * 60 * 1000 // 24h
+
 export interface OfflineAction<T = any> {
   id: string
   type: string
@@ -23,7 +26,13 @@ class OfflineQueueService {
     try {
       const stored = localStorage.getItem(this.storageKey)
       if (stored) {
-        this.queue = JSON.parse(stored)
+        const parsed: OfflineAction[] = JSON.parse(stored)
+        const now = Date.now()
+        this.queue = parsed.filter(action => now - action.timestamp < ACTION_TTL_MS)
+
+        if (this.queue.length !== parsed.length) {
+          this.saveQueue()
+        }
       }
     } catch (e) {
       console.error('Failed to load offline queue', e)
@@ -40,6 +49,10 @@ class OfflineQueueService {
   }
 
   enqueue(type: string, payload: any) {
+    if (this.queue.length >= MAX_QUEUE_SIZE) {
+      this.queue.shift()
+    }
+
     const action: OfflineAction = {
       id: Math.random().toString(36).substr(2, 9),
       type,
@@ -67,6 +80,14 @@ class OfflineQueueService {
   }
 
   getQueue(): OfflineAction[] {
+    const now = Date.now()
+    const validActions = this.queue.filter(action => now - action.timestamp < ACTION_TTL_MS)
+
+    if (validActions.length !== this.queue.length) {
+      this.queue = validActions
+      this.saveQueue()
+    }
+
     return this.queue
   }
 

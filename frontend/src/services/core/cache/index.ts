@@ -4,11 +4,7 @@
  */
 
 export {
-  apiCache,
   mapboxCache,
   CACHE_INVALIDATION_MAP,
-  invalidateRelatedCaches,
-  setCacheUser,
+  clearAllAppStorage,
 } from './api-cache'
-
-export { default } from './api-cache'
