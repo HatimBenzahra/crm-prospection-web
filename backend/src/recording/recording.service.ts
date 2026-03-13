@@ -29,6 +29,7 @@ import {
 } from './recording.dto';
 import { PrismaService } from '../prisma.service';
 import { TranscriptionService } from '../transcription/transcription.service';
+import { SpeechAnalysisService } from '../transcription/speech-analysis.service';
 
 type RoomTarget = {
   type: 'COMMERCIAL' | 'MANAGER';
@@ -74,6 +75,7 @@ export class RecordingService {
   constructor(
     private prisma: PrismaService,
     private transcription: TranscriptionService,
+    private speechAnalysis: SpeechAnalysisService,
   ) {}
 
   private normalizeRoomName(roomName: string): string {
@@ -668,5 +670,46 @@ export class RecordingService {
     } catch {
       return null;
     }
+  }
+
+  getSpeechScores(
+    keys: string[],
+  ): Array<{
+    key: string;
+    score?: number;
+    totalDurationSec?: number;
+    speechDurationSec?: number;
+    status: string;
+  }> {
+    const validKeys = keys.filter((k) => !k.endsWith('_conv.mp4'));
+
+    const cached = this.speechAnalysis.getCachedScores(validKeys);
+
+    const uncachedKeys = validKeys.filter(
+      (k) => !cached.has(k) && !this.speechAnalysis.isAnalyzing(k),
+    );
+
+    if (uncachedKeys.length > 0) {
+      this.speechAnalysis.triggerBatchAnalysis(uncachedKeys);
+    }
+
+    return validKeys.map((key) => {
+      const score = cached.get(key);
+      if (score) {
+        return {
+          key,
+          score: score.score,
+          totalDurationSec: score.totalDurationSec,
+          speechDurationSec: score.speechDurationSec,
+          status: 'ready',
+        };
+      }
+
+      if (this.speechAnalysis.isAnalyzing(key)) {
+        return { key, status: 'analyzing' };
+      }
+
+      return { key, status: 'pending' };
+    });
   }
 }

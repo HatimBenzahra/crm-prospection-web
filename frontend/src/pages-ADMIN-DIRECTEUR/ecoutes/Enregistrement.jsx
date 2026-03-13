@@ -42,6 +42,7 @@ import {
   SortableTableHeader,
   DateRangeFilter,
   SmartSearchBar,
+  SpeechScoreBar,
 } from './EnregistrementComponents'
 
 export default function Enregistrement() {
@@ -103,6 +104,7 @@ export default function Enregistrement() {
     clearRecentSelection,
     handleRecentBatchExtraction,
     processedKeys,
+    speechScores,
   } = useEnregistrementLogic()
 
   const [recentModalRecording, setRecentModalRecording] = useState(null)
@@ -361,6 +363,7 @@ export default function Enregistrement() {
                     isSelected={selectedRecentIds.has(recording.id)}
                     onToggleSelect={toggleRecentSelection}
                     isProcessed={processedKeys.has(recording.key)}
+                    speechScore={speechScores.get(recording.key)}
                   />
                 ))}
               </div>
@@ -654,13 +657,21 @@ export default function Enregistrement() {
                           onSort={handleSort}
                         />
                       </TableHead>
+                      <TableHead>
+                        <SortableTableHeader
+                          label="Parole"
+                          sortKey="speechScore"
+                          currentSort={sortConfig}
+                          onSort={handleSort}
+                        />
+                      </TableHead>
                       <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {currentRecordings.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           Aucun enregistrement trouvé
                         </TableCell>
                       </TableRow>
@@ -716,6 +727,15 @@ export default function Enregistrement() {
                             </div>
                           </TableCell>
                           <TableCell>{recording.duration}</TableCell>
+                          <TableCell>
+                            {(() => {
+                              const sc = speechScores.get(recording.key)
+                              if (sc?.status === 'ready' && typeof sc.score === 'number') {
+                                return <SpeechScoreBar score={sc.score} />
+                              }
+                              return <div className="w-10 h-1.5 animate-pulse bg-muted rounded-full" />
+                            })()}
+                          </TableCell>
                           <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                             <div className="flex items-center gap-2 justify-end">
                               <Button

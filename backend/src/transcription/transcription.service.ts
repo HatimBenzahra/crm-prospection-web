@@ -14,7 +14,9 @@ import { Readable } from 'stream';
 
 const execFileAsync = promisify(execFile);
 
-const FFMPEG_MAX_BUFFER = 10 * 1024 * 1024; // 10 MB
+import { SpeechAnalysisService } from './speech-analysis.service';
+
+const FFMPEG_MAX_BUFFER = 10 * 1024 * 1024;
 
 interface WhisperSegment {
   start: number;
@@ -39,6 +41,8 @@ export interface ExtractionProgress {
 @Injectable()
 export class TranscriptionService implements OnModuleDestroy {
   private readonly logger = new Logger(TranscriptionService.name);
+
+  constructor(private readonly speechAnalysis: SpeechAnalysisService) {}
 
   private readonly whisperUrl = process.env.WHISPER_API_URL;
   private readonly whisperTimeoutMs = this.resolveWhisperTimeout();
@@ -182,13 +186,19 @@ export class TranscriptionService implements OnModuleDestroy {
       }
 
       this.setProgress(s3Key, 'transcribing', 2);
-      const segments = await this.transcribe(originalFile);
-      if (!segments || segments.length === 0) {
+      const whisperResult = await this.transcribe(originalFile);
+      if (!whisperResult || whisperResult.segments.length === 0) {
         this.logger.warn(
           `Aucun segment de parole détecté pour ${s3Key} — pas de version conversation`,
         );
         this.failProgress(s3Key);
         return;
+      }
+
+      const { segments, duration: whisperDuration } = whisperResult;
+
+      if (whisperDuration > 0) {
+        this.speechAnalysis.cacheFromWhisperSegments(s3Key, segments, whisperDuration);
       }
 
       const merged = this.mergeSegments(segments, 2.0);
@@ -265,7 +275,7 @@ export class TranscriptionService implements OnModuleDestroy {
     }
   }
 
-  private async transcribe(filePath: string): Promise<WhisperSegment[] | null> {
+  private async transcribe(filePath: string): Promise<{ segments: WhisperSegment[]; duration: number } | null> {
     try {
       const fileBuffer = fs.readFileSync(filePath);
 
@@ -306,7 +316,9 @@ export class TranscriptionService implements OnModuleDestroy {
         `Whisper : ${data.segments?.length || 0} segments en ${data.processing_time?.toFixed(1)}s`,
       );
 
-      return data.segments || null;
+      if (!data.segments || data.segments.length === 0) return null;
+
+      return { segments: data.segments, duration: data.duration || 0 };
     } catch (error) {
       if (error?.name === 'AbortError') {
         this.logger.error(

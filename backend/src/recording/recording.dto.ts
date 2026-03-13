@@ -1,4 +1,4 @@
-import { Field, ObjectType, InputType, Int } from '@nestjs/graphql';
+import { Field, ObjectType, InputType, Int, Float } from '@nestjs/graphql';
 
 @ObjectType()
 export class RecordingResult {
@@ -91,4 +91,13 @@ export class ExtractionQueueItemDto {
   @Field() step: string;
   @Field(() => Int) current: number;
   @Field(() => Int) total: number;
+}
+
+@ObjectType()
+export class SpeechScoreDto {
+  @Field() key: string;
+  @Field(() => Int, { nullable: true }) score?: number;
+  @Field(() => Float, { nullable: true }) totalDurationSec?: number;
+  @Field(() => Float, { nullable: true }) speechDurationSec?: number;
+  @Field() status: string;
 }

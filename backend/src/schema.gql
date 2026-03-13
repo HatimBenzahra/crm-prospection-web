@@ -565,6 +565,7 @@ type Query {
   getExtractionProgress(key: String!): ExtractionProgressDto
   getExtractionQueue: [ExtractionQueueItemDto!]!
   getProcessedKeys(keys: [String!]!): [String!]!
+  getRecordingSpeechScores(keys: [String!]!): [SpeechScoreDto!]!
   getStreamingUrl(key: String!): String!
   immeuble(id: Int!): Immeuble!
   immeubles: [Immeuble!]!
@@ -693,6 +694,14 @@ type SeedBadgesResult {
   skipped: Int!
   success: Boolean!
   total: Int!
+}
+
+type SpeechScoreDto {
+  key: String!
+  score: Int
+  speechDurationSec: Float
+  status: String!
+  totalDurationSec: Float
 }
 
 input StartMonitoringInput {

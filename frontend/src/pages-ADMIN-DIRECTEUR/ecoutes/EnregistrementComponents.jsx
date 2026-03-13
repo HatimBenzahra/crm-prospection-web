@@ -10,6 +10,26 @@ import {
 } from '@/components/ui/dialog'
 import { ChevronUp, ChevronDown, ChevronsUpDown, Download, CalendarDays, X, Search, HelpCircle, User, Keyboard, FileText, MessageSquare, Check } from 'lucide-react'
 
+export function formatDuration(seconds) {
+  if (!seconds || seconds <= 0) return null
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+export function SpeechScoreBar({ score }) {
+  const barColor = score >= 50 ? 'bg-emerald-500' : score >= 20 ? 'bg-amber-500' : 'bg-red-500'
+  const textColor = score >= 50 ? 'text-emerald-500' : score >= 20 ? 'text-amber-500' : 'text-red-500'
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="w-10 h-1.5 rounded-full bg-muted overflow-hidden">
+        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${score}%` }} />
+      </div>
+      <span className={`text-[10px] font-medium ${textColor}`}>{score}%</span>
+    </div>
+  )
+}
+
 export function formatRelativeDate(dateString) {
   if (!dateString) return ''
   const date = new Date(dateString)
@@ -68,7 +88,7 @@ export function RecordingStatusBadge({ lastModified }) {
   return null
 }
 
-export function RecordingCard({ recording, onPlay, onDownload, isSelected, onToggleSelect, isProcessed }) {
+export function RecordingCard({ recording, onPlay, onDownload, isSelected, onToggleSelect, isProcessed, speechScore }) {
   return (
     <div
       className={`border rounded-xl p-3 hover:border-border hover:shadow-sm transition-all duration-200 cursor-pointer bg-card ${
@@ -118,7 +138,15 @@ export function RecordingCard({ recording, onPlay, onDownload, isSelected, onTog
               {formatRelativeDate(recording.lastModified)}
             </span>
             <span className="text-[10px] text-muted-foreground/50">·</span>
-            <span className="text-[10px] text-muted-foreground/70">{recording.duration}</span>
+            <span className="text-[10px] text-muted-foreground/70">
+              {speechScore?.totalDurationSec ? formatDuration(speechScore.totalDurationSec) : recording.duration}
+            </span>
+            {speechScore?.status === 'ready' && typeof speechScore.score === 'number' && (
+              <SpeechScoreBar score={speechScore.score} />
+            )}
+            {(speechScore?.status === 'analyzing' || speechScore?.status === 'pending') && (
+              <div className="w-10 h-1.5 animate-pulse bg-muted rounded-full" />
+            )}
             <RecordingStatusBadge lastModified={recording.lastModified} />
             {isProcessed && (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600">

@@ -12,6 +12,7 @@ import {
   ConfirmRecordingUploadInput,
   ExtractionProgressDto,
   ExtractionQueueItemDto,
+  SpeechScoreDto,
 } from './recording.dto';
 import { RecordingService } from './recording.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -134,5 +135,13 @@ export class RecordingResolver {
     @Args({ name: 'keys', type: () => [String] }) keys: string[],
   ): Promise<string[]> {
     return this.svc.getProcessedKeys(keys);
+  }
+
+  @Query(() => [SpeechScoreDto])
+  @Roles('admin', 'directeur')
+  getRecordingSpeechScores(
+    @Args({ name: 'keys', type: () => [String] }) keys: string[],
+  ): SpeechScoreDto[] {
+    return this.svc.getSpeechScores(keys);
   }
 }

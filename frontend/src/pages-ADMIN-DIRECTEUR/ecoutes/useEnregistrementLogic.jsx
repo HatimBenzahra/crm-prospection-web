@@ -43,6 +43,7 @@ export function useEnregistrementLogic() {
   const [extractionDrawerOpen, setExtractionDrawerOpen] = useState(false)
   const [selectedRecentIds, setSelectedRecentIds] = useState(new Set())
   const [processedKeys, setProcessedKeys] = useState(new Set())
+  const [speechScores, setSpeechScores] = useState(new Map())
 
   const statusFilterOptions = useMemo(
     () => [{ value: 'ALL', label: 'Tous' }, ...USER_STATUS_OPTIONS],
@@ -140,6 +141,44 @@ export function useEnregistrementLogic() {
     return () => { active = false }
   }, [recentRecordings])
 
+  useEffect(() => {
+    const allKeys = [
+      ...recentRecordings.map(r => r.key),
+      ...recordings.map(r => r.key),
+    ].filter(Boolean)
+    const uniqueKeys = [...new Set(allKeys)]
+    if (!uniqueKeys.length) return
+
+    let active = true
+    let timerId
+
+    const fetchScores = async () => {
+      if (!active) return
+      try {
+        const results = await RecordingService.getSpeechScores(uniqueKeys)
+        if (!active) return
+        setSpeechScores(prev => {
+          const next = new Map(prev)
+          results.forEach(r => { next.set(r.key, r) })
+          return next
+        })
+        const hasUnready = results.some(r => r.status !== 'ready')
+        if (hasUnready && active) {
+          timerId = setTimeout(fetchScores, 4000)
+        }
+      } catch {
+        void 0
+      }
+    }
+
+    fetchScores()
+
+    return () => {
+      active = false
+      clearTimeout(timerId)
+    }
+  }, [recentRecordings, recordings])
+
   const handleSort = useCallback(key => {
     setSortConfig(prev => ({
       key,
@@ -223,6 +262,9 @@ export function useEnregistrementLogic() {
       } else if (sortConfig.key === 'size') {
         leftValue = a.size
         rightValue = b.size
+      } else if (sortConfig.key === 'speechScore') {
+        leftValue = speechScores.get(a.key)?.score ?? -1
+        rightValue = speechScores.get(b.key)?.score ?? -1
       } else {
         leftValue = new Date(a.lastModified).getTime()
         rightValue = new Date(b.lastModified).getTime()
@@ -234,7 +276,7 @@ export function useEnregistrementLogic() {
     })
 
     return sortConfig.direction === 'asc' ? sorted : sorted.reverse()
-  }, [filteredRecordings, sortConfig])
+  }, [filteredRecordings, sortConfig, speechScores])
 
   // Utiliser le hook de pagination
   const {
@@ -613,5 +655,6 @@ export function useEnregistrementLogic() {
     clearRecentSelection,
     handleRecentBatchExtraction,
     processedKeys,
+    speechScores,
   }
 }

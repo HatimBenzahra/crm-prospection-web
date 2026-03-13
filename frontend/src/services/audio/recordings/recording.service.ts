@@ -89,6 +89,18 @@ const GET_PROCESSED_KEYS = `
   }
 `
 
+const GET_SPEECH_SCORES = `
+  query GetRecordingSpeechScores($keys: [String!]!) {
+    getRecordingSpeechScores(keys: $keys) {
+      key
+      score
+      totalDurationSec
+      speechDurationSec
+      status
+    }
+  }
+`
+
 // Service pour la gestion des enregistrements
 export class RecordingService {
   /**
@@ -290,6 +302,17 @@ export class RecordingService {
       return new Set(data.getProcessedKeys || [])
     } catch {
       return new Set()
+    }
+  }
+
+  static async getSpeechScores(
+    keys: string[]
+  ): Promise<Array<{ key: string; score?: number; totalDurationSec?: number; speechDurationSec?: number; status: string }>> {
+    try {
+      const data = await graphqlClient.request(GET_SPEECH_SCORES, { keys })
+      return data.getRecordingSpeechScores || []
+    } catch {
+      return []
     }
   }
 
