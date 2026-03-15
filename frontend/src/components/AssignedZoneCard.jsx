@@ -72,7 +72,32 @@ function createGeoJSONCircle(center, radiusInMeters, points = 64) {
   }
 }
 
-// Fonction pour récupérer l'adresse via reverse geocoding Mapbox AVEC CACHE
+function getImmeubleMarkerProps(immeuble) {
+  const totalPortes = (immeuble.portes || []).length
+  const prospectees = (immeuble.portes || []).filter(p => p.statut !== 'NON_VISITE').length
+  const couverture = totalPortes > 0 ? Math.round((prospectees / totalPortes) * 100) : 0
+  const contrats = (immeuble.portes || [])
+    .filter(p => p.statut === 'CONTRAT_SIGNE')
+    .reduce((sum, p) => sum + (p.nbContrats || 1), 0)
+
+  let colorClass, progressColor
+  if (couverture === 0) {
+    colorClass = 'bg-gray-500 hover:bg-gray-600'
+    progressColor = '#6b7280'
+  } else if (couverture < 50) {
+    colorClass = 'bg-amber-500 hover:bg-amber-600'
+    progressColor = '#f59e0b'
+  } else if (couverture < 100) {
+    colorClass = 'bg-blue-600 hover:bg-blue-700'
+    progressColor = '#2563eb'
+  } else {
+    colorClass = 'bg-emerald-500 hover:bg-emerald-600'
+    progressColor = '#10b981'
+  }
+
+  return { totalPortes, couverture, contrats, colorClass, progressColor }
+}
+
 const fetchLocationName = async (longitude, latitude) => {
   const roundedLng = longitude.toFixed(4)
   const roundedLat = latitude.toFixed(4)
@@ -361,51 +386,70 @@ export default function AssignedZoneCard({
           {zone && !showAllImmeubles && <Marker longitude={zone.xOrigin} latitude={zone.yOrigin} />}
 
           {/* Immeubles sur la carte */}
-          {immeublesWithCoordinates.map(immeuble => (
-            <Marker
-              key={`immeuble-${immeuble.id}`}
-              longitude={immeuble.longitude}
-              latitude={immeuble.latitude}
-            >
-              <button
-                type="button"
-                className="relative cursor-pointer group"
-                title={`${immeuble.adresse}\n${immeuble.nbEtages} étages, ${immeuble.nbPortesParEtage} portes/étage\nCliquez pour voir les détails`}
-                onClick={e => {
-                  e.stopPropagation()
-                  handleImmeubleClick(immeuble.id)
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
+          {immeublesWithCoordinates.map(immeuble => {
+            const portes = immeuble.portes || []
+            const totalPortes = portes.length
+            const prospectees = portes.filter(p => p.statut !== 'NON_VISITE').length
+            const couverture = totalPortes > 0 ? Math.round((prospectees / totalPortes) * 100) : 0
+            const contrats = portes.filter(p => p.statut === 'CONTRAT_SIGNE').reduce((s, p) => s + (p.nbContrats || 1), 0)
+            const markerBg =
+              couverture === 0 ? 'bg-gray-500' :
+              couverture < 50 ? 'bg-amber-500' :
+              couverture < 100 ? 'bg-blue-600' :
+              'bg-emerald-500'
+
+            return (
+              <Marker
+                key={`immeuble-${immeuble.id}`}
+                longitude={immeuble.longitude}
+                latitude={immeuble.latitude}
+              >
+                <button
+                  type="button"
+                  className="relative cursor-pointer group"
+                  onClick={e => {
                     e.stopPropagation()
                     handleImmeubleClick(immeuble.id)
-                  }
-                }}
-              >
-                {/* Icône bâtiment */}
-                <div className="bg-blue-600 text-white p-2 rounded-lg shadow-lg border-2 border-white hover:bg-blue-700 hover:scale-110 transition-all duration-200 active:scale-95">
-                  <Building2 className="h-4 w-4" />
-                </div>
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleImmeubleClick(immeuble.id)
+                    }
+                  }}
+                >
+                  <div className={`${markerBg} text-white p-2 rounded-lg shadow-lg border-2 border-white hover:scale-110 transition-all duration-200 active:scale-95`}>
+                    <Building2 className="h-4 w-4" />
+                  </div>
 
-                {/* Tooltip au survol */}
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                  <div className="font-medium">{immeuble.adresse}</div>
-                  <div className="text-gray-200">
-                    {immeuble.nbEtages} étages • {immeuble.nbPortesParEtage} portes/étage
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2.5 bg-gray-900 text-white text-xs rounded-xl shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 space-y-1">
+                    <div className="font-semibold text-[13px]">{immeuble.adresse}</div>
+                    <div className="text-gray-300">
+                      {immeuble.nbEtages} ét. × {immeuble.nbPortesParEtage} = {totalPortes > 0 ? totalPortes : immeuble.nbEtages * immeuble.nbPortesParEtage} portes
+                    </div>
+                    {totalPortes > 0 && (
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <div className="flex-1 h-1 bg-gray-700 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${markerBg}`} style={{ width: `${couverture}%` }} />
+                        </div>
+                        <span className="text-[11px] tabular-nums">{couverture}%</span>
+                      </div>
+                    )}
+                    {contrats > 0 && (
+                      <div className="text-emerald-400">{contrats} contrat{contrats > 1 ? 's' : ''}</div>
+                    )}
+                    {immeuble.commercial && (
+                      <div className="text-gray-300">
+                        👤 {immeuble.commercial.prenom} {immeuble.commercial.nom}
+                      </div>
+                    )}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
                   </div>
-                  <div className="text-gray-200">
-                    Total: {immeuble.nbEtages * immeuble.nbPortesParEtage} portes
-                  </div>
-                  <div className="text-blue-300 mt-1 text-center">
-                    👆 Cliquez pour voir les détails
-                  </div>
-                  {/* Flèche du tooltip */}
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-                </div>
-              </button>
-            </Marker>
-          ))}
+                </button>
+              </Marker>
+            )
+          })}
 
           {/* Cercle de la zone - seulement si on a une zone */}
           {circleGeoJSON && !showAllImmeubles && (

@@ -3,7 +3,7 @@ import { AdvancedDataTable } from '@/components/tableau'
 import { MapSkeleton, TableSkeleton } from '@/components/LoadingSkeletons'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -15,13 +15,14 @@ import {
 import {
   LayoutList,
   Map as MapIcon,
-  Info,
   Building,
   FileText,
   Percent,
   SlidersHorizontal,
   Calendar,
   User,
+  CalendarCheck,
+  EyeOff,
 } from 'lucide-react'
 import { useImmeublesLogic } from './useImmeublesLogic'
 
@@ -64,24 +65,7 @@ export default function Immeubles() {
 
   return (
     <div className="space-y-6">
-      <Alert className="bg-primary/5 border-primary/20">
-        <div className="flex items-start gap-4">
-          <div className="p-2 bg-primary/10 rounded-full mt-1">
-            <Info className="h-4 w-4 text-primary" />
-          </div>
-          <div className="space-y-1">
-            <AlertTitle className="text-primary font-semibold">Gestion des Immeubles</AlertTitle>
-            <AlertDescription className="text-muted-foreground text-sm leading-relaxed">
-              Utilisez les filtres pour trier par date de création ou de modification, et filtrer
-              par commercial. Basculez entre la vue liste et la vue carte pour visualiser vos
-              immeubles sur une map.
-            </AlertDescription>
-          </div>
-        </div>
-      </Alert>
-
-      {/* Cartes de Statistiques */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
         <Card className="transition-all duration-300 hover:shadow-lg hover:border-primary/20 dark:hover:border-primary/20 hover:-translate-y-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -92,7 +76,7 @@ export default function Immeubles() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-foreground">
+            <div className="text-3xl font-bold tracking-tight tabular-nums text-foreground">
               {stats.totalImmeubles}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Dans votre parc immobilier</p>
@@ -109,7 +93,7 @@ export default function Immeubles() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-foreground">
+            <div className="text-3xl font-bold tracking-tight tabular-nums text-foreground">
               {stats.totalContrats}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Total cumulé des signatures</p>
@@ -126,10 +110,44 @@ export default function Immeubles() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-foreground">
+            <div className="text-3xl font-bold tracking-tight tabular-nums text-foreground">
               {stats.avgCouverture}%
             </div>
             <p className="text-xs text-muted-foreground mt-1">Portes prospectées</p>
+          </CardContent>
+        </Card>
+
+        <Card className="transition-all duration-300 hover:shadow-lg hover:border-primary/20 dark:hover:border-primary/20 hover:-translate-y-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              RDV Programmés
+            </CardTitle>
+            <div className="p-2 bg-blue-500/10 rounded-full">
+              <CalendarCheck className="h-4 w-4 text-blue-500" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold tracking-tight tabular-nums text-foreground">
+              {stats.totalRdv}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Rendez-vous à venir</p>
+          </CardContent>
+        </Card>
+
+        <Card className="transition-all duration-300 hover:shadow-lg hover:border-primary/20 dark:hover:border-primary/20 hover:-translate-y-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Non Visités
+            </CardTitle>
+            <div className="p-2 bg-gray-500/10 rounded-full">
+              <EyeOff className="h-4 w-4 text-gray-500" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold tracking-tight tabular-nums text-foreground">
+              {stats.totalNonVisites}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Portes non prospectées</p>
           </CardContent>
         </Card>
       </div>
@@ -182,23 +200,30 @@ export default function Immeubles() {
           </Select>
         </div>
 
-        <div className="flex gap-2">
-          <Button
-            variant={viewMode === 'list' ? 'default' : 'outline'}
-            onClick={() => setViewMode('list')}
-            className="gap-2"
-          >
-            <LayoutList className="h-4 w-4" />
-            Vue Liste
-          </Button>
-          <Button
-            variant={viewMode === 'map' ? 'default' : 'outline'}
-            onClick={() => setViewMode('map')}
-            className="gap-2"
-          >
-            <MapIcon className="h-4 w-4" />
-            Vue Carte
-          </Button>
+        <div className="flex items-center gap-3">
+          <Badge variant="secondary" className="text-xs tabular-nums">
+            {filteredImmeubles.length} immeuble{filteredImmeubles.length > 1 ? 's' : ''}
+          </Badge>
+          <div className="flex gap-1">
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className="gap-2"
+            >
+              <LayoutList className="h-4 w-4" />
+              Liste
+            </Button>
+            <Button
+              variant={viewMode === 'map' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('map')}
+              className="gap-2"
+            >
+              <MapIcon className="h-4 w-4" />
+              Carte
+            </Button>
+          </div>
         </div>
       </div>
 

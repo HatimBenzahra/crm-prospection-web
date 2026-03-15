@@ -11,6 +11,14 @@ import {
   useEntityDescription,
 } from '@/hooks/metier/permissions/useRoleBasedData'
 import { useErrorToast } from '@/hooks/utils/ui/use-error-toast'
+import { Badge } from '@/components/ui/badge'
+import { getStatusColor, getStatusLabel } from '@/constants/domain/porte-status'
+
+function calculnbcontrats(immeuble) {
+  return (immeuble.portes || [])
+    .filter(p => p.statut === 'CONTRAT_SIGNE')
+    .reduce((sum, p) => sum + (p.nbContrats || 1), 0)
+}
 
 export function useImmeublesLogic() {
   const { showError, showSuccess } = useErrorToast()
@@ -100,13 +108,6 @@ export function useImmeublesLogic() {
   const permissions = useEntityPermissions('immeubles')
   const description = useEntityDescription('immeubles')
 
-  function calculnbcontrats(immeuble) {
-    // Somme des nbContrats pour toutes les portes avec statut CONTRAT_SIGNE
-    return (immeuble.portes || [])
-      .filter(p => p.statut === 'CONTRAT_SIGNE')
-      .reduce((sum, p) => sum + (p.nbContrats || 1), 0)
-  }
-
   // Configuration des colonnes
   const immeublesColumns = useMemo(
     () => [
@@ -114,40 +115,90 @@ export function useImmeublesLogic() {
         header: 'Adresse',
         accessor: 'address',
         sortable: true,
-        className: 'font-medium',
-      },
-      {
-        header: 'Date de création',
-        accessor: 'createdAt',
-        sortable: true,
-        className: 'hidden lg:table-cell',
-        cell: row => new Date(row.createdAt).toLocaleDateString('fr-FR'),
+        className: 'font-medium max-w-[280px]',
+        cell: row => (
+          <div className="truncate">
+            <span className="text-[13px] font-medium">{row.address}</span>
+          </div>
+        ),
       },
       {
         header: 'Commercial',
         accessor: 'commercial_name',
         sortable: true,
-        className: 'hidden xl:table-cell',
+        className: 'hidden xl:table-cell text-[13px]',
       },
       {
-        header: 'contrats signés',
+        header: 'Ét.',
+        accessor: 'floors',
+        sortable: true,
+        className: 'hidden md:table-cell tabular-nums text-[13px] text-center',
+      },
+      {
+        header: 'Portes',
+        accessor: 'total_doors',
+        sortable: true,
+        className: 'hidden md:table-cell tabular-nums text-[13px] text-center',
+      },
+      {
+        header: 'Contrats',
         accessor: 'contrats_signes',
         sortable: true,
         className: 'hidden md:table-cell text-center',
-        cell: row => `${row.contrats_signes} contrats`,
+        cell: row => (
+          <span className={`tabular-nums text-[13px] font-medium ${row.contrats_signes > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+            {row.contrats_signes > 0 && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 align-middle" />}
+            {row.contrats_signes}
+          </span>
+        ),
+      },
+      {
+        header: 'RDV',
+        accessor: 'rdvCount',
+        sortable: true,
+        className: 'hidden lg:table-cell text-center',
+        cell: row =>
+          row.rdvCount > 0 ? (
+            <Badge className="text-[10px] bg-blue-100 text-blue-800">{row.rdvCount}</Badge>
+          ) : (
+            <span className="text-[13px] text-muted-foreground">—</span>
+          ),
+      },
+      {
+        header: 'Non visités',
+        accessor: 'nonVisiteCount',
+        sortable: true,
+        className: 'hidden xl:table-cell text-center',
+        cell: row => (
+          <span
+            className={`tabular-nums text-[13px] ${row.nonVisiteCount === 0 ? 'text-muted-foreground' : 'font-medium'}`}
+          >
+            {row.nonVisiteCount}
+          </span>
+        ),
       },
       {
         header: 'Couverture',
         accessor: 'couverture',
         sortable: true,
-        className: 'hidden lg:table-cell text-center',
-        cell: row => `${row.couverture}%`,
+        className: 'hidden lg:table-cell',
+        cell: row => (
+          <div className="flex items-center gap-2 min-w-[100px]">
+            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${row.couverture >= 80 ? 'bg-emerald-500' : row.couverture >= 40 ? 'bg-blue-500' : row.couverture > 0 ? 'bg-amber-500' : 'bg-muted'}`}
+                style={{ width: `${row.couverture}%` }}
+              />
+            </div>
+            <span className="tabular-nums text-[12px] text-muted-foreground w-9 text-right">{row.couverture}%</span>
+          </div>
+        ),
       },
       {
-        header: 'Date de création',
+        header: 'Créé le',
         accessor: 'createdAt',
         sortable: true,
-        className: 'hidden lg:table-cell',
+        className: 'hidden xl:table-cell text-[12px] tabular-nums text-muted-foreground',
         cell: row => new Date(row.createdAt).toLocaleDateString('fr-FR'),
       },
     ],
@@ -225,6 +276,9 @@ export function useImmeublesLogic() {
         responsibleName = `${manager.prenom} ${manager.nom} (Manager)`
       }
 
+      const rdvCount = portesImmeuble.filter(p => p.statut === 'RENDEZ_VOUS_PRIS').length
+      const nonVisiteCount = portesImmeuble.filter(p => p.statut === 'NON_VISITE').length
+
       return {
         ...immeuble,
         address: immeuble.adresse,
@@ -233,6 +287,8 @@ export function useImmeublesLogic() {
         total_doors: totalDoors,
         contrats_signes: calculnbcontrats(immeuble),
         couverture: couverture,
+        rdvCount,
+        nonVisiteCount,
         commercial_name: responsibleName,
       }
     })
@@ -252,13 +308,18 @@ export function useImmeublesLogic() {
           ).toFixed(1)
         : 0
 
-    return { data: mappedData, stats: { totalImmeubles, totalContrats, avgCouverture } }
+    const totalRdv = mappedData.reduce((acc, curr) => acc + curr.rdvCount, 0)
+    const totalNonVisites = mappedData.reduce((acc, curr) => acc + curr.nonVisiteCount, 0)
+
+    return { data: mappedData, stats: { totalImmeubles, totalContrats, avgCouverture, totalRdv, totalNonVisites } }
   }, [filteredImmeubles, commercials, managers, effectiveSortBy])
 
   const stats = tableData?.stats || {
     totalImmeubles: 0,
     totalContrats: 0,
     avgCouverture: 0,
+    totalRdv: 0,
+    totalNonVisites: 0,
   }
   const finalTableData = tableData?.data || []
 
