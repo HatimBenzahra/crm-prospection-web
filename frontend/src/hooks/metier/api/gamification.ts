@@ -136,3 +136,11 @@ export function useContratsByManager(managerId: number) {
     'contrats'
   )
 }
+
+export function useOffreDistribution(periodMonth: string) {
+  return useApiCall(
+    () => gamificationApi.getOffreDistribution(periodMonth),
+    [periodMonth],
+    'offreDistribution'
+  )
+}

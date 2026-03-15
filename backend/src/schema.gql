@@ -521,6 +521,15 @@ type Offre {
   updatedAt: DateTime!
 }
 
+type OffreDistributionEntry {
+  categorie: String!
+  count: Int!
+  fournisseur: String!
+  logoUrl: String
+  nom: String!
+  offreId: Int!
+}
+
 type PaginatedRecordingsResult {
   items: [RecordingItem!]!
   totalCount: Int!
@@ -599,6 +608,7 @@ type Query {
   managers: [Manager!]!
   mappingSuggestions: [MappingSuggestion!]!
   me: UserInfo!
+  offreDistribution(periodMonth: String!): [OffreDistributionEntry!]!
   offres(activeOnly: Boolean! = true): [Offre!]!
   porte(id: Int!): Porte!
   porteStatistics(immeubleId: Int!): PorteStatistics!

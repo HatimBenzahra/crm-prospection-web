@@ -190,7 +190,42 @@ export class RankingService {
     });
   }
 
-  /** Récupérer le classement d'un commercial spécifique sur toutes les périodes */
+  async getOffreDistribution(periodMonth: string) {
+    const contrats = await this.prisma.contratValide.findMany({
+      where: { periodMonth },
+      select: { offreId: true },
+    });
+
+    const countByOffre: Record<number, number> = {};
+    for (const c of contrats) {
+      if (c.offreId) countByOffre[c.offreId] = (countByOffre[c.offreId] || 0) + 1;
+    }
+
+    const offreIds = Object.keys(countByOffre).map(Number);
+    if (offreIds.length === 0) return [];
+
+    const offres = await this.prisma.offre.findMany({
+      where: { id: { in: offreIds } },
+      select: { id: true, nom: true, categorie: true, fournisseur: true, logoUrl: true },
+    });
+
+    const offreMap = new Map(offres.map(o => [o.id, o]));
+
+    return offreIds
+      .map(id => {
+        const offre = offreMap.get(id);
+        return {
+          offreId: id,
+          nom: offre?.nom || 'Inconnue',
+          categorie: offre?.categorie || '',
+          fournisseur: offre?.fournisseur || '',
+          logoUrl: offre?.logoUrl || undefined,
+          count: countByOffre[id],
+        };
+      })
+      .sort((a, b) => b.count - a.count);
+  }
+
   async getCommercialRankings(commercialId: number) {
     return this.prisma.rankSnapshot.findMany({
       where: { commercialId },

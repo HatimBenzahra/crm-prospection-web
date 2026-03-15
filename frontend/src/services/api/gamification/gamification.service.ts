@@ -14,6 +14,7 @@ import {
   GET_MAPPING_SUGGESTIONS,
   GET_CONTRATS_BY_COMMERCIAL,
   GET_CONTRATS_BY_MANAGER,
+  GET_OFFRE_DISTRIBUTION,
 } from './gamification.queries'
 import {
   SYNC_OFFRES,
@@ -171,5 +172,10 @@ export const gamificationApi = {
   async getContratsByManager(managerId: number): Promise<ContratValide[]> {
     const response = await gql<QueryContratsByManagerResponse>(GET_CONTRATS_BY_MANAGER, { managerId })
     return response.contratsByManager
+  },
+
+  async getOffreDistribution(periodMonth: string): Promise<Array<{ offreId: number; nom: string; categorie: string; fournisseur: string; logoUrl?: string; count: number }>> {
+    const response = await gql<{ offreDistribution: Array<{ offreId: number; nom: string; categorie: string; fournisseur: string; logoUrl?: string; count: number }> }>(GET_OFFRE_DISTRIBUTION, { periodMonth })
+    return response.offreDistribution
   },
 }

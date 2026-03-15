@@ -9,6 +9,7 @@ import {
   usePortesModifiedToday,
   usePortesRdvToday,
 } from '@/hooks/metier/use-api'
+import { useRanking, useOffreDistribution } from '@/hooks/metier/api/gamification'
 import { gql } from '@/services/core/graphql'
 
 const GET_SEGMENTS_TODAY = `
@@ -32,12 +33,35 @@ const GET_SEGMENTS_TODAY = `
   }
 `
 
+function computePeriodKey(mode) {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return mode === 'DAILY' ? `${y}-${m}-${d}` : `${y}-${m}`
+}
+
+function currentMonthKey() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 export function useDashboardLogic() {
   const [currentRdvPage, setCurrentRdvPage] = useState(1)
-  const [segmentFilter, setSegmentFilter] = useState(() => sessionStorage.getItem('dashboard-segment-filter') || 'ARGUMENTE')
+  const [segmentFilter, setSegmentFilter] = useState(
+    () => sessionStorage.getItem('dashboard-segment-filter') || 'ARGUMENTE'
+  )
   const [segments, setSegments] = useState([])
   const [segmentsLoading, setSegmentsLoading] = useState(false)
   const ITEMS_PER_PAGE = 4
+
+  const [perfMode, setPerfMode] = useState('MONTHLY')
+  const perfPeriodKey = useMemo(() => computePeriodKey(perfMode), [perfMode])
+  const { data: ranking, loading: rankingLoading } = useRanking(perfMode, perfPeriodKey)
+
+  const [offreMonth, setOffreMonth] = useState(currentMonthKey)
+  const { data: offreDistribution, loading: offreDistributionLoading } =
+    useOffreDistribution(offreMonth)
 
   const { data: commercials, loading: loadingCommercials } = useCommercials()
   const { data: managers, loading: loadingManagers } = useManagers()
@@ -48,7 +72,7 @@ export function useDashboardLogic() {
   const { data: portesModifiedToday, loading: loadingPortesModified } = usePortesModifiedToday()
   const { data: rdvToday, loading: loadingRdvToday } = usePortesRdvToday()
 
-  const fetchSegments = useCallback(async (statut) => {
+  const fetchSegments = useCallback(async statut => {
     setSegmentsLoading(true)
     try {
       const response = await gql(GET_SEGMENTS_TODAY, { statut, limit: 15 })
@@ -85,7 +109,7 @@ export function useDashboardLogic() {
 
     // Compter par statut (avec somme des nbContrats pour CONTRAT_SIGNE)
     portesModifiedToday.forEach(porte => {
-      if (porte.statut === 'CONTRAT_SIGNE') stats.contrats += (porte.nbContrats || 1)
+      if (porte.statut === 'CONTRAT_SIGNE') stats.contrats += porte.nbContrats || 1
       else if (porte.statut === 'RENDEZ_VOUS_PRIS') stats.rdv++
       else if (porte.statut === 'REFUS') stats.refus++
     })
@@ -114,6 +138,21 @@ export function useDashboardLogic() {
     return { items, totalPages, startIndex, endIndex }
   }, [rdvToday, currentRdvPage])
 
+  const top3 = useMemo(() => {
+    if (!ranking) return []
+    return ranking.filter(e => e.points > 0).slice(0, 3)
+  }, [ranking])
+
+  const offreTotalContrats = useMemo(() => {
+    if (!offreDistribution?.length) return 0
+    return offreDistribution.reduce((s, e) => s + e.count, 0)
+  }, [offreDistribution])
+
+  const offreMaxCount = useMemo(() => {
+    if (!offreDistribution?.length) return 1
+    return offreDistribution[0].count
+  }, [offreDistribution])
+
   const isLoading =
     loadingCommercials ||
     loadingManagers ||
@@ -136,6 +175,20 @@ export function useDashboardLogic() {
     segmentsLoading,
     segmentFilter,
     setSegmentFilter,
+
+    perfMode,
+    setPerfMode,
+    perfPeriodKey,
+    top3,
+    rankingLoading,
+
+    offreMonth,
+    setOffreMonth,
+    offreDistribution,
+    offreDistributionLoading,
+    offreTotalContrats,
+    offreMaxCount,
+
     data: {
       commercials,
       managers,

@@ -35,9 +35,9 @@ export class GamificationCronService {
   // CRON PRINCIPAL — Tous les jours à 2h du matin
   // ============================================================================
 
-  @Cron(CronExpression.EVERY_DAY_AT_2AM)
-  async handleDailyGamification() {
-    this.logger.log('🎮 Début du pipeline gamification quotidien');
+  @Cron(CronExpression.EVERY_HOUR)
+  async handleHourlyGamification() {
+    this.logger.log('🎮 Début du pipeline gamification horaire');
     const start = Date.now();
 
     try {

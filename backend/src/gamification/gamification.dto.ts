@@ -655,3 +655,24 @@ export class ComputeRankingInput {
   @IsString()
   periodKey: string; // "2026-02-25", "2026-W09", "2026-02"
 }
+
+@ObjectType()
+export class OffreDistributionEntry {
+  @Field(() => Int)
+  offreId: number;
+
+  @Field()
+  nom: string;
+
+  @Field()
+  categorie: string;
+
+  @Field()
+  fournisseur: string;
+
+  @Field({ nullable: true })
+  logoUrl?: string;
+
+  @Field(() => Int)
+  count: number;
+}

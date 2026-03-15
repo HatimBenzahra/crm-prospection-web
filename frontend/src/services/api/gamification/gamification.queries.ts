@@ -226,3 +226,16 @@ export const GET_CONTRATS_BY_MANAGER = `
     }
   }
 `
+
+export const GET_OFFRE_DISTRIBUTION = `
+  query GetOffreDistribution($periodMonth: String!) {
+    offreDistribution(periodMonth: $periodMonth) {
+      offreId
+      nom
+      categorie
+      fournisseur
+      logoUrl
+      count
+    }
+  }
+`

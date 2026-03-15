@@ -22,6 +22,7 @@ import {
   ComputeRankingInput,
   ContratValideType,
   SyncContratsResult,
+  OffreDistributionEntry,
 } from './gamification.dto';
 import { BadgeCategory, RankPeriod } from '@prisma/client';
 import { MappingService } from './mapping.service';
@@ -389,6 +390,14 @@ export class GamificationResolver {
         managerPrenom: s.manager?.prenom,
       };
     });
+  }
+
+  @Query(() => [OffreDistributionEntry], { name: 'offreDistribution' })
+  @Roles('admin', 'directeur', 'manager', 'commercial')
+  async getOffreDistribution(
+    @Args('periodMonth') periodMonth: string,
+  ): Promise<OffreDistributionEntry[]> {
+    return this.rankingService.getOffreDistribution(periodMonth);
   }
 
   @Query(() => [RankSnapshotType], { name: 'commercialRankings' })
