@@ -424,6 +424,7 @@ export class RecordingService {
     for (const obj of resp.Contents || []) {
       if (!obj.Key) continue;
       if (obj.Key.endsWith('_conv.mp4')) continue;
+      if (obj.Key.includes('_porte_')) continue;
       out.push({
         key: obj.Key,
         size: obj.Size,
@@ -1174,6 +1175,7 @@ export class RecordingService {
         for (const obj of resp.Contents || []) {
           if (!obj.Key) continue;
           if (obj.Key.endsWith('_conv.mp4')) continue;
+          if (obj.Key.includes('_porte_')) continue;
           items.push({
             key: obj.Key,
             size: obj.Size,
