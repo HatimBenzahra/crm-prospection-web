@@ -741,39 +741,39 @@ export class RecordingService {
       take: limit,
     });
 
-    const withUrls = await Promise.all(
-      segments.map(async (segment) => ({
-        ...segment,
-        streamingUrl: segment.s3KeySegment
+    const mapped = await Promise.all(
+      segments.map(async (segment) => {
+        const streamingUrl = segment.s3KeySegment
           ? await this.signedUrlOrUndefined(segment.s3KeySegment)
-          : undefined,
-      })),
+          : undefined;
+
+        const comm = segment.porte.immeuble.commercial;
+        const mgr = segment.porte.immeuble.manager;
+        const commercialNom = comm ? `${comm.prenom} ${comm.nom}` : mgr ? `${mgr.prenom} ${mgr.nom}` : undefined;
+
+        return {
+          id: segment.id,
+          porteId: segment.porteId,
+          porteNumero: segment.porte.numero,
+          porteEtage: segment.porte.etage,
+          immeubleAdresse: segment.porte.immeuble.adresse,
+          commercialNom,
+          s3KeySegment: segment.s3KeySegment ?? undefined,
+          statut: segment.statut ?? undefined,
+          startTime: segment.startTime,
+          endTime: segment.endTime,
+          durationSec: segment.durationSec,
+          transcription: segment.transcription ?? undefined,
+          speechScore: segment.speechScore ?? undefined,
+          status: segment.status,
+          streamingUrl,
+          createdAt: segment.createdAt,
+          immeubleId: segment.porte.immeuble.id,
+        };
+      }),
     );
 
-    return withUrls.map((segment) => {
-      const comm = segment.porte.immeuble.commercial;
-      const mgr = segment.porte.immeuble.manager;
-      const commercialNom = comm ? `${comm.prenom} ${comm.nom}` : mgr ? `${mgr.prenom} ${mgr.nom}` : undefined;
-      return {
-      id: segment.id,
-      porteId: segment.porteId,
-      porteNumero: segment.porte.numero,
-      porteEtage: segment.porte.etage,
-      immeubleAdresse: segment.porte.immeuble.adresse,
-      commercialNom,
-      s3KeySegment: segment.s3KeySegment ?? undefined,
-      statut: segment.statut ?? undefined,
-      startTime: segment.startTime,
-      endTime: segment.endTime,
-      durationSec: segment.durationSec,
-      transcription: segment.transcription ?? undefined,
-      speechScore: segment.speechScore ?? undefined,
-      status: segment.status,
-      streamingUrl: segment.streamingUrl,
-      createdAt: segment.createdAt,
-      immeubleId: segment.porte.immeuble.id,
-    };
-    });
+    return mapped;
   }
 
   async getSegmentsByImmeuble(
@@ -879,7 +879,7 @@ export class RecordingService {
 
           await this.uploadSegmentToS3(segmentFilePath, segmentS3Key);
           const transcription = await this.transcribeSegment(segmentFilePath);
-          const speechScore = await this.computeSpeechScore(segmentFilePath);
+          const speechScore = await this.speechAnalysis.computeScore(segmentFilePath);
 
           await this.prisma.recordingSegment.update({
             where: { id: segment.id },
@@ -890,16 +890,6 @@ export class RecordingService {
               status: 'COMPLETED',
             },
           });
-
-          if (speechScore !== null) {
-            const duration = segment.endTime - segment.startTime;
-            const speechDurationSec = (speechScore / 100) * duration;
-            this.speechAnalysis.cacheFromWhisperSegments(
-              segmentS3Key,
-              [{ start: 0, end: speechDurationSec }],
-              duration,
-            );
-          }
         } catch (error) {
           this.logger.error(
             `Segment processing failed for segmentId=${segment.id}: ${error?.message || error}`,
@@ -922,41 +912,6 @@ export class RecordingService {
       }
     } finally {
       this.cleanupDir(tmpDir);
-    }
-  }
-
-  private async computeSpeechScore(filePath: string): Promise<number | null> {
-    try {
-      const { stdout } = await execFileAsync('ffprobe', [
-        '-v', 'quiet', '-print_format', 'json', '-show_format', filePath,
-      ]);
-      const totalDuration = parseFloat(JSON.parse(stdout)?.format?.duration ?? '0');
-      if (totalDuration <= 0) return null;
-
-      const { stderr } = await execFileAsync('ffmpeg', [
-        '-i', filePath,
-        '-af', 'silencedetect=n=-40dB:d=0.5',
-        '-f', 'null', '-',
-      ], { maxBuffer: FFMPEG_MAX_BUFFER });
-
-      let silenceDuration = 0;
-      const lines = stderr.split('\n');
-      let silenceStart: number | null = null;
-      for (const line of lines) {
-        const startMatch = line.match(/silence_start:\s*(\d+(?:\.\d+)?)/);
-        if (startMatch) { silenceStart = parseFloat(startMatch[1]); continue; }
-        const endMatch = line.match(/silence_end:\s*(\d+(?:\.\d+)?)/);
-        if (endMatch && silenceStart !== null) {
-          silenceDuration += parseFloat(endMatch[1]) - silenceStart;
-          silenceStart = null;
-        }
-      }
-
-      const speechDuration = Math.max(0, totalDuration - silenceDuration);
-      return Math.round(Math.min(100, (speechDuration / totalDuration) * 100));
-    } catch (error) {
-      this.logger.warn(`Speech score computation failed: ${error?.message || error}`);
-      return null;
     }
   }
 

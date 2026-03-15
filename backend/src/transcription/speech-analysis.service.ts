@@ -11,6 +11,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { pipeline } from 'stream/promises';
 import { Readable } from 'stream';
+import { PrismaService } from '../prisma.service';
 
 const execFileAsync = promisify(execFile);
 
@@ -23,8 +24,8 @@ export interface SpeechScore {
 @Injectable()
 export class SpeechAnalysisService implements OnModuleDestroy {
   private readonly logger = new Logger(SpeechAnalysisService.name);
+  private readonly prisma: PrismaService;
 
-  /** In-memory cache: s3Key → SpeechScore */
   private readonly cache = new Map<string, SpeechScore>();
 
   /** Track in-flight analyses to avoid duplicate work */
@@ -47,6 +48,10 @@ export class SpeechAnalysisService implements OnModuleDestroy {
   });
 
   /** Silence detection thresholds tuned for compressed phone audio */
+  constructor(prisma: PrismaService) {
+    this.prisma = prisma;
+  }
+
   private readonly noiseThresholdDb = -40;
   private readonly minSilenceSec = 0.5;
 
@@ -60,7 +65,22 @@ export class SpeechAnalysisService implements OnModuleDestroy {
   // Public API
   // ---------------------------------------------------------------------------
 
-  /** Return cached score for a single key, or null if not yet analyzed */
+  async computeScore(filePath: string): Promise<number | null> {
+    try {
+      const [totalDuration, silences] = await Promise.all([
+        this.getMediaDuration(filePath),
+        this.detectSilences(filePath),
+      ]);
+      if (totalDuration <= 0) return null;
+      const silenceDuration = silences.reduce((sum, s) => sum + (s.end - s.start), 0);
+      const speechDurationSec = Math.max(0, totalDuration - silenceDuration);
+      return Math.round(Math.min(100, (speechDurationSec / totalDuration) * 100));
+    } catch (error) {
+      this.logger.warn(`computeScore failed: ${error?.message || error}`);
+      return null;
+    }
+  }
+
   getCachedScore(key: string): SpeechScore | null {
     return this.cache.get(key) ?? null;
   }
@@ -179,6 +199,8 @@ export class SpeechAnalysisService implements OnModuleDestroy {
         speechDurationSec,
       });
 
+      await this.persistScore(s3Key, score);
+
       this.logger.debug(
         `Score silencedetect pour ${s3Key}: ${score}% (${speechDurationSec.toFixed(1)}s parole / ${totalDuration.toFixed(1)}s total)`,
       );
@@ -190,6 +212,17 @@ export class SpeechAnalysisService implements OnModuleDestroy {
       this.cleanupDir(tmpDir);
       this.analyzing.delete(s3Key);
       this.releaseSlot();
+    }
+  }
+
+  private async persistScore(s3Key: string, score: number): Promise<void> {
+    try {
+      await this.prisma.recordingSegment.updateMany({
+        where: { s3KeySegment: s3Key, speechScore: null },
+        data: { speechScore: score },
+      });
+    } catch {
+      // Best-effort — segment may not exist for full recordings
     }
   }
 
