@@ -54,6 +54,8 @@ import { AppSidebar } from '@/components/sidebar'
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
 import ThemeToggle from '@/components/ThemeSwitchDarklight'
+import { ChevronRight, Search } from 'lucide-react'
+import GlobalSearchDialog from '@/components/GlobalSearchDialog'
 
 import React from 'react'
 
@@ -119,14 +121,14 @@ function AdminLayout() {
               <div className="flex items-center gap-2 px-4">
                 <SidebarTrigger className="-ml-1" />
                 <Separator orientation="vertical" className="mr-2 h-4" />
-                <nav className="flex items-center space-x-2 text-sm font-medium text-muted-foreground">
+                <nav className="flex items-center gap-1 text-sm text-muted-foreground">
                     {breadcrumbs.map((crumb, index) => (
                       <React.Fragment key={`${crumb.href}-${crumb.label}-${crumb.isCurrent ? 'current' : 'link'}`}>
-                      {index > 0 && <span className="text-muted-foreground">›</span>}
+                      {index > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />}
                       {crumb.isCurrent ? (
-                        <span className="text-foreground">{crumb.label}</span>
+                        <span className="font-semibold text-foreground">{crumb.label}</span>
                       ) : (
-                        <Link to={crumb.href} className="hover:text-foreground">
+                        <Link to={crumb.href} className="hover:text-foreground transition-colors rounded-md px-1.5 py-0.5 hover:bg-muted">
                           {crumb.label}
                         </Link>
                       )}
@@ -134,11 +136,22 @@ function AdminLayout() {
                   ))}
                 </nav>
               </div>
-              <div className="flex items-center gap-2 px-4">
+              <div className="flex items-center gap-3 px-4">
+                <button
+                  type="button"
+                  onClick={() => document.dispatchEvent(new CustomEvent('open-global-search'))}
+                  className="hidden md:inline-flex items-center gap-3 w-64 rounded-xl border border-border/50 bg-muted/20 px-3.5 py-2 text-sm text-muted-foreground/70 hover:bg-muted/40 hover:text-muted-foreground hover:border-border transition-all duration-150 shadow-sm"
+                >
+                  <Search className="h-4 w-4 shrink-0" />
+                  <span className="flex-1 text-left text-[13px]">Rechercher...</span>
+                  <kbd className="pointer-events-none inline-flex h-5 items-center gap-0.5 rounded-md border border-border/40 bg-background/80 px-1.5 font-mono text-[10px] font-medium text-muted-foreground/50">
+                    ⌘K
+                  </kbd>
+                </button>
                 <ThemeToggle />
               </div>
             </header>
-            <div className="flex flex-1 flex-col gap-4 p-6 pt-6 overflow-x-hidden mx-auto w-11/12 max-w-[1400px]">
+            <div className="flex flex-1 flex-col gap-4 p-6 pt-6 overflow-x-hidden mx-auto w-11/12 max-w-[1400px] animate-fade-in-content">
               <Suspense fallback={null}>
                 <Routes>
                   <Route
@@ -306,6 +319,7 @@ function AdminLayout() {
               </Suspense>
             </div>
           </SidebarInset>
+          <GlobalSearchDialog />
         </SidebarProvider>
       </DetailsSectionsProvider>
     </ErrorBoundary>

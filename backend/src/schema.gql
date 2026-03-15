@@ -302,6 +302,11 @@ type ExtractionQueueItemDto {
   total: Int!
 }
 
+type GlobalSearchResult {
+  groups: [SearchResultGroup!]!
+  totalCount: Int!
+}
+
 type HistoriqueZone {
   assignedAt: DateTime!
   id: Int!
@@ -582,6 +587,7 @@ type Query {
   getProcessedKeys(keys: [String!]!): [String!]!
   getRecordingSpeechScores(keys: [String!]!): [SpeechScoreDto!]!
   getStreamingUrl(key: String!): String!
+  globalSearch(limit: Int! = 5, query: String!): GlobalSearchResult!
   immeuble(id: Int!): Immeuble!
   immeubles: [Immeuble!]!
   listAllRecordings(roomNames: [String!]!): PaginatedRecordingsResult!
@@ -723,6 +729,19 @@ enum RoleUtilisateur {
   COMMERCIAL
   DIRECTEUR
   MANAGER
+}
+
+type SearchResultGroup {
+  category: String!
+  items: [SearchResultItem!]!
+}
+
+type SearchResultItem {
+  id: Int!
+  label: String!
+  sublabel: String
+  type: String!
+  url: String!
 }
 
 type SeedBadgesResult {

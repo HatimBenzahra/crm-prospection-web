@@ -18,6 +18,7 @@ import { AudioMonitoringModule } from './audio-monitoring/audio-monitoring.modul
 import { RecordingModule } from './recording/recording.module';
 import { CreationCompteModule } from './creation_compte/creation_compte.module';
 import { GamificationModule } from './gamification/gamification.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { GamificationModule } from './gamification/gamification.module';
     RecordingModule,
     CreationCompteModule,
     GamificationModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

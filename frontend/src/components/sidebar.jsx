@@ -354,11 +354,11 @@ export function AppSidebar() {
           { label: 'Équipe', items: teamItems },
           { label: 'Prospection', items: prospectionItems },
           { label: 'Outils', items: toolsItems },
-        ].map(group => {
+        ].map((group, idx) => {
           const groupVisible = group.items.filter(item => !item.entity || hasPermission(currentRole, item.entity, 'view'))
           if (groupVisible.length === 0) return null
           return (
-            <SidebarGroup key={group.label}>
+            <SidebarGroup key={group.label} className={idx > 0 ? 'border-t border-sidebar-border/50 pt-2' : ''}>
               <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40 font-semibold">{group.label}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
