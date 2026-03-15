@@ -1,10 +1,5 @@
 import {
-  Calendar,
   Home,
-  Inbox,
-  Search,
-  Settings,
-  ChevronUp,
   ChevronDown,
   User2,
   Building2,
@@ -15,9 +10,15 @@ import {
   Trophy,
   Users,
   ArrowLeft,
+  LogOut,
+  Shield,
+  UserCog,
+  Briefcase,
+  Settings,
 } from 'lucide-react'
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import logoSvg from '@/assets/logo.svg'
 import { useRole } from '@/contexts/userole'
 import { hasPermission, ROLES } from '@/hooks/metier/permissions/roleFilters'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@radix-ui/react-collapsible'
@@ -39,123 +40,52 @@ import {
   SidebarMenuSubButton,
 } from '@/components/ui/sidebar'
 
-// Menu items avec permissions requises
-const items = [
-  {
-    title: 'Dashboard',
-    url: '/',
-    icon: Home,
-    entity: 'dashboard',
-  },
-  {
-    title: 'Directeurs',
-    url: '/directeurs',
-    icon: Search,
-    entity: 'directeurs',
-  },
-  {
-    title: 'Managers',
-    url: '/managers',
-    icon: Calendar,
-    entity: 'managers',
-  },
-  {
-    title: 'Commerciaux',
-    url: '/commerciaux',
-    icon: Inbox,
-    entity: 'commerciaux',
-  },
-  {
-    title: 'Gamification',
-    url: '/gamification',
-    icon: Trophy,
-    entity: 'gamification',
-    subitems: [
-      {
-        title: 'Classement',
-        url: '/gamification',
-      },
-      {
-        title: 'Badges',
-        url: '/gamification/badges',
-      },
-      {
-        title: 'Mapping',
-        url: '/gamification/mapping',
-      },
-      {
-        title: 'Offres',
-        url: '/gamification/offres',
-      },
-      {
-        title: 'Synchronisation',
-        url: '/gamification/sync',
-      },
-    ],
-  },
-  {
-    title: 'Gestion',
-    url: '/gestion',
-    icon: Users,
-    entity: 'gestion',
-  },
-  {
-    title: 'Immeubles',
-    url: '/immeubles',
-    icon: Building2,
-    entity: 'immeubles',
-  },
-  {
-    title: 'Zones',
-    url: '/zones',
-    icon: MapPin,
-    entity: 'zones',
-    subitems: [
-      {
-        title: "Vue d'ensemble",
-        url: '/zones',
-      },
-      {
-        title: 'Assignations en cours',
-        url: '/zones/assignations',
-      },
-      {
-        title: 'Historique',
-        url: '/zones/historique',
-      },
-    ],
-  },
-  {
-    title: 'Suivi GPS',
-    url: '/gps-tracking',
-    icon: Navigation2,
-    entity: 'gps-tracking',
-    disabled: true,
-  },
-  {
-    title: 'Écoutes',
-    url: '/ecoutes',
-    icon: Headphones,
-    entity: 'ecoutes',
-    subitems: [
-      {
-        title: 'Écoute Live',
-        url: '/ecoutes/live',
-      },
-      {
-        title: 'Enregistrement',
-        url: '/ecoutes/enregistrement',
-      },
-    ],
-  },
-  {
-    title: 'Statistiques',
-    url: '/statistiques',
-    icon: BarChart3,
-    entity: 'statistics',
-  },
-  
+const mainItems = [
+  { title: 'Dashboard', url: '/', icon: Home, entity: 'dashboard' },
 ]
+
+const teamItems = [
+  { title: 'Directeurs', url: '/directeurs', icon: Shield, entity: 'directeurs' },
+  { title: 'Managers', url: '/managers', icon: UserCog, entity: 'managers' },
+  { title: 'Commerciaux', url: '/commerciaux', icon: Briefcase, entity: 'commerciaux' },
+  { title: 'Gestion', url: '/gestion', icon: Users, entity: 'gestion' },
+]
+
+const prospectionItems = [
+  { title: 'Immeubles', url: '/immeubles', icon: Building2, entity: 'immeubles' },
+  {
+    title: 'Zones', url: '/zones', icon: MapPin, entity: 'zones',
+    subitems: [
+      { title: "Vue d'ensemble", url: '/zones' },
+      { title: 'Assignations', url: '/zones/assignations' },
+      { title: 'Historique', url: '/zones/historique' },
+    ],
+  },
+  { title: 'Suivi GPS', url: '/gps-tracking', icon: Navigation2, entity: 'gps-tracking', disabled: true },
+]
+
+const toolsItems = [
+  {
+    title: 'Écoutes', url: '/ecoutes', icon: Headphones, entity: 'ecoutes',
+    subitems: [
+      { title: 'Écoute Live', url: '/ecoutes/live' },
+      { title: 'Enregistrements', url: '/ecoutes/enregistrement' },
+    ],
+  },
+  {
+    title: 'Gamification', url: '/gamification', icon: Trophy, entity: 'gamification',
+    subitems: [
+      { title: 'Classement', url: '/gamification' },
+      { title: 'Badges', url: '/gamification/badges' },
+      { title: 'Mapping', url: '/gamification/mapping' },
+      { title: 'Offres', url: '/gamification/offres' },
+      { title: 'Synchronisation', url: '/gamification/sync' },
+    ],
+  },
+  { title: 'Statistiques', url: '/statistiques', icon: BarChart3, entity: 'statistics' },
+]
+
+const items = [...mainItems, ...teamItems, ...prospectionItems, ...toolsItems]
 
 export function AppSidebar() {
   const { currentRole, logout } = useRole()
@@ -324,165 +254,145 @@ export function AppSidebar() {
     return hasPermission(currentRole, item.entity, 'view')
   })
 
+  const renderMenuItem = (item) => {
+    if (item.subitems) {
+      const isAnySubitemActive = item.subitems.some(sub => isActiveRoute(sub.url))
+      return (
+        <Collapsible
+          key={item.title}
+          open={openMenus[item.title] ?? isAnySubitemActive}
+          onOpenChange={open => setOpenMenus(prev => ({ ...prev, [item.title]: open }))}
+          className="group/collapsible"
+        >
+          <SidebarMenuItem>
+            <CollapsibleTrigger asChild>
+              <SidebarMenuButton tooltip={item.title}>
+                <item.icon className="h-4 w-4 shrink-0" />
+                <span>{item.title}</span>
+                <ChevronDown className="ml-auto h-3.5 w-3.5 text-sidebar-foreground/40 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+              </SidebarMenuButton>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <SidebarMenuSub>
+                {item.subitems.map(subitem => (
+                  <SidebarMenuSubItem key={subitem.title}>
+                    {subitem.isSection ? (
+                      <SidebarMenuSubButton
+                        onClick={() => handleScrollToSection(subitem.id)}
+                        isActive={activeSection === subitem.id}
+                      >
+                        <span>{subitem.title}</span>
+                      </SidebarMenuSubButton>
+                    ) : subitem.isBackLink ? (
+                      <SidebarMenuSubButton asChild isActive={false} className="font-semibold text-primary">
+                        <Link to={subitem.url}>
+                          <ArrowLeft className="h-3 w-3 mr-1" />
+                          <span>{subitem.title}</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    ) : (
+                      <SidebarMenuSubButton asChild isActive={isActiveRoute(subitem.url, item.subitems)}>
+                        <Link to={subitem.url}>
+                          <span>{subitem.title}</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    )}
+                  </SidebarMenuSubItem>
+                ))}
+              </SidebarMenuSub>
+            </CollapsibleContent>
+          </SidebarMenuItem>
+        </Collapsible>
+      )
+    }
+
+    return (
+      <SidebarMenuItem key={item.title}>
+        <SidebarMenuButton
+          asChild={!item.disabled}
+          isActive={isActiveRoute(item.url)}
+          disabled={item.disabled}
+          tooltip={item.disabled ? 'Bientôt disponible' : item.title}
+          className={cn(item.disabled && 'opacity-40 cursor-not-allowed')}
+        >
+          {item.disabled ? (
+            <div className="flex w-full items-center gap-3">
+              <item.icon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{item.title}</span>
+            </div>
+          ) : (
+            <Link to={item.url} className="flex w-full items-center gap-3">
+              <item.icon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{item.title}</span>
+            </Link>
+          )}
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    )
+  }
+
   return (
     <Sidebar collapsible="icon" data-sidebar="sidebar">
-      <SidebarHeader>
+      <SidebarHeader className="pb-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <div>
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <User2 className="size-4" />
+            <SidebarMenuButton size="lg" asChild className="hover:bg-sidebar-accent/50">
+              <Link to="/" className="gap-3">
+                <img src={logoSvg} alt="Pro-Win" className="size-10 rounded-xl shadow-md" />
+                <div className="grid flex-1 text-left leading-tight">
+                  <span className="truncate text-base font-bold tracking-tight">Pro-Win</span>
+                  <span className="truncate text-[11px] text-sidebar-foreground/50 font-medium">Prospection</span>
                 </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Pro-Win</span>
-                  <span className="truncate text-xs">Module prospection</span>
-                </div>
-              </div>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {visibleItems.map(item => {
-                // If item has subitems, render as collapsible
-                if (item.subitems) {
-                  const isAnySubitemActive = item.subitems.some(subitem =>
-                    isActiveRoute(subitem.url)
-                  )
-
-                  return (
-                    <Collapsible
-                      key={item.title}
-                      open={openMenus[item.title] ?? isAnySubitemActive}
-                      onOpenChange={open => setOpenMenus(prev => ({ ...prev, [item.title]: open }))}
-                      className="group/collapsible"
-                    >
-                      <SidebarMenuItem>
-                        <CollapsibleTrigger asChild>
-                          <SidebarMenuButton tooltip={item.title}>
-                            <item.icon />
-                            <span>{item.title}</span>
-                            <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                          </SidebarMenuButton>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <SidebarMenuSub>
-                            {item.subitems.map(subitem => (
-                              <SidebarMenuSubItem key={subitem.title}>
-                                {subitem.isSection ? (
-                                  // Pour les sections, utiliser un bouton avec scroll et état actif basé sur le scroll
-                                  <SidebarMenuSubButton
-                                    onClick={() => handleScrollToSection(subitem.id)}
-                                    isActive={activeSection === subitem.id}
-                                  >
-                                    <span>{subitem.title}</span>
-                                  </SidebarMenuSubButton>
-                                ) : subitem.isBackLink ? (
-                                  // Pour le lien de retour, utiliser un style différent avec une icône
-                                  <SidebarMenuSubButton
-                                    asChild
-                                    isActive={false}
-                                    className="font-semibold text-primary"
-                                  >
-                                    <Link to={subitem.url}>
-                                      <ArrowLeft className="h-3 w-3 mr-1" />
-                                      <span>{subitem.title}</span>
-                                    </Link>
-                                  </SidebarMenuSubButton>
-                                ) : (
-                                  // Pour les vraies sous-pages, utiliser un lien
-                                  <SidebarMenuSubButton
-                                    asChild
-                                    isActive={isActiveRoute(subitem.url, item.subitems)}
-                                  >
-                                    <Link to={subitem.url}>
-                                      <span>{subitem.title}</span>
-                                    </Link>
-                                  </SidebarMenuSubButton>
-                                )}
-                              </SidebarMenuSubItem>
-                            ))}
-                          </SidebarMenuSub>
-                        </CollapsibleContent>
-                      </SidebarMenuItem>
-                    </Collapsible>
-                  )
-                }
-
-                // Regular menu item without subitems
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild={!item.disabled}
-                      isActive={isActiveRoute(item.url)}
-                      disabled={item.disabled}
-                      tooltip={item.disabled ? 'Fonctionnalité bientôt disponible' : undefined}
-                      className={cn(
-                        'gap-3 data-[sidebar-collapsed=true]:justify-center data-[sidebar-collapsed=true]:px-0',
-                        item.disabled && 'opacity-50 cursor-not-allowed'
-                      )}
-                    >
-                      {item.disabled ? (
-                        <div
-                          className="flex w-full items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Fonctionnalité bientôt disponible"
-                        >
-                          <item.icon className="h-4 w-4 shrink-0" />
-                          <span className="truncate data-[sidebar-collapsed=true]:hidden">
-                            {item.title}
-                          </span>
-                        </div>
-                      ) : (
-                        <Link to={item.url} className="flex w-full items-center gap-3">
-                          <item.icon className="h-4 w-4 shrink-0" />
-                          <span className="truncate data-[sidebar-collapsed=true]:hidden">
-                            {item.title}
-                          </span>
-                        </Link>
-                      )}
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {[
+          { label: 'Principal', items: mainItems },
+          { label: 'Équipe', items: teamItems },
+          { label: 'Prospection', items: prospectionItems },
+          { label: 'Outils', items: toolsItems },
+        ].map(group => {
+          const groupVisible = group.items.filter(item => !item.entity || hasPermission(currentRole, item.entity, 'view'))
+          if (groupVisible.length === 0) return null
+          return (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40 font-semibold">{group.label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {groupVisible.map(item => {
+                    const enriched = enrichedItems.find(e => e.title === item.title) || item
+                    return renderMenuItem(enriched)
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )
+        })}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
-          {/* Affichage des informations utilisateur */}
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
               tooltip={`Utilisateur - ${currentRole}`}
               className="w-full"
             >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+              <div className="flex aspect-square size-8 items-center justify-center rounded-full bg-sidebar-primary/20 text-sidebar-primary">
                 <User2 className="size-4" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">Utilisateur</span>
-                <span className="truncate text-xs capitalize text-muted-foreground">
+                <span className="truncate text-xs capitalize text-sidebar-foreground/50">
                   {currentRole}
                 </span>
               </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          {/* Bouton de déconnexion */}
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={logout}
-              tooltip="Se déconnecter"
-              className="w-full bg-destructive/10 hover:bg-destructive hover:text-destructive-foreground text-destructive font-medium transition-colors"
-              size="sm"
-            >
-              <ChevronUp className="h-4 w-4 rotate-180" />
-              <span>Se déconnecter</span>
+              <LogOut
+                className="h-4 w-4 text-sidebar-foreground/40 hover:text-destructive cursor-pointer transition-colors ml-auto"
+                onClick={(e) => { e.stopPropagation(); logout(); }}
+              />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
