@@ -365,8 +365,9 @@ export class GamificationResolver {
   async getRanking(
     @Args('period', { type: () => RankPeriod }) period: RankPeriod,
     @Args('periodKey') periodKey: string,
+    @Args('includeContratFinie', { type: () => Boolean, defaultValue: false }) includeContratFinie: boolean,
   ): Promise<RankSnapshotType[]> {
-    const snapshots = await this.rankingService.getRanking(period, periodKey);
+    const snapshots = await this.rankingService.getRanking(period, periodKey, includeContratFinie);
     return snapshots.map((s) => {
       const tier = this.rankingService.resolvePointTier(s.points);
       return {

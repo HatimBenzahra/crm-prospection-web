@@ -51,19 +51,19 @@ export class RankingService {
   ): Promise<{ computed: number }> {
     const periodField = this.getPeriodField(period);
 
-    // 1. Récupérer tous les commerciaux actifs avec mapping WinLead+
+    // 1. Récupérer tous les commerciaux avec mapping WinLead+ (ACTIF + CONTRAT_FINIE)
     const commercials = await this.prisma.commercial.findMany({
       where: {
-        status: 'ACTIF',
+        status: { in: ['ACTIF', 'CONTRAT_FINIE'] },
         winleadPlusId: { not: null },
       },
       select: { id: true },
     });
 
-    // 2. Récupérer tous les managers actifs avec mapping WinLead+
+    // 2. Récupérer tous les managers avec mapping WinLead+ (ACTIF + CONTRAT_FINIE)
     const managers = await this.prisma.manager.findMany({
       where: {
-        status: 'ACTIF',
+        status: { in: ['ACTIF', 'CONTRAT_FINIE'] },
         winleadPlusId: { not: null },
       },
       select: { id: true },
@@ -164,15 +164,18 @@ export class RankingService {
   // READ — Récupérer le classement d'une période
   // ============================================================================
 
-  /** Récupérer le classement complet d'une période (commerciaux + managers) */
-  async getRanking(period: RankPeriod, periodKey: string) {
+  async getRanking(period: RankPeriod, periodKey: string, includeContratFinie = false) {
+    const statusFilter = includeContratFinie
+      ? { in: ['ACTIF' as const, 'CONTRAT_FINIE' as const] }
+      : { equals: 'ACTIF' as const };
+
     return this.prisma.rankSnapshot.findMany({
       where: {
         period,
         periodKey,
         OR: [
-          { commercial: { winleadPlusId: { not: null } } },
-          { manager: { winleadPlusId: { not: null } } },
+          { commercial: { winleadPlusId: { not: null }, status: statusFilter } },
+          { manager: { winleadPlusId: { not: null }, status: statusFilter } },
         ],
       },
       include: {

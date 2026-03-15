@@ -86,6 +86,7 @@ export function useGamificationLogic() {
   const [badgeCategoryFilter, setBadgeCategoryFilter] = useState('all')
   const [syncResults, setSyncResults] = useState({})
   const [editingOffre, setEditingOffre] = useState(null)
+  const [includeContratFinie, setIncludeContratFinie] = useState(false)
 
   // --- Clé de période calculée ---
   const periodKey = useMemo(() => computePeriodKey(rankPeriod), [rankPeriod])
@@ -96,7 +97,7 @@ export function useGamificationLogic() {
     loading: rankingLoading,
     error: rankingError,
     refetch: refetchRanking,
-  } = useRanking(rankPeriod, periodKey)
+  } = useRanking(rankPeriod, periodKey, includeContratFinie)
 
   const {
     data: offres,
@@ -274,6 +275,8 @@ export function useGamificationLogic() {
     setBadgeCategoryFilter,
     editingOffre,
     setEditingOffre,
+    includeContratFinie,
+    setIncludeContratFinie,
     syncResults,
 
     // Data

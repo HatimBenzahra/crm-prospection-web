@@ -64,8 +64,8 @@ import type {
 
 export const gamificationApi = {
   // --- Ranking ---
-  async getRanking(period: string, periodKey: string): Promise<RankSnapshot[]> {
-    const response = await gql<QueryRankingResponse>(GET_RANKING, { period, periodKey })
+  async getRanking(period: string, periodKey: string, includeContratFinie?: boolean): Promise<RankSnapshot[]> {
+    const response = await gql<QueryRankingResponse>(GET_RANKING, { period, periodKey, includeContratFinie })
     return response.ranking
   },
 

@@ -606,7 +606,7 @@ type Query {
   portesByImmeuble(etage: Int, immeubleId: Int!, skip: Int, take: Int): [Porte!]!
   portesModifiedToday(immeubleId: Int): [Porte!]!
   portesRdvToday: [Porte!]!
-  ranking(period: RankPeriod!, periodKey: String!): [RankSnapshotType!]!
+  ranking(includeContratFinie: Boolean! = false, period: RankPeriod!, periodKey: String!): [RankSnapshotType!]!
   recordingSegmentsByImmeuble(immeubleId: Int!): [RecordingSegmentDto!]!
   recordingSegmentsByKey(s3Key: String!): [RecordingSegmentDto!]!
   recordingSegmentsByPorte(porteId: Int!): [RecordingSegmentDto!]!

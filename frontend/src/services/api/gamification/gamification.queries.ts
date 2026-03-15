@@ -3,8 +3,8 @@
  */
 
 export const GET_RANKING = `
-  query GetRanking($period: RankPeriod!, $periodKey: String!) {
-    ranking(period: $period, periodKey: $periodKey) {
+  query GetRanking($period: RankPeriod!, $periodKey: String!, $includeContratFinie: Boolean) {
+    ranking(period: $period, periodKey: $periodKey, includeContratFinie: $includeContratFinie) {
       id
       commercialId
       managerId

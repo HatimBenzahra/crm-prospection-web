@@ -6,8 +6,8 @@ import { gamificationApi } from '@/services/api/gamification'
 import { useApiCall, useApiMutation } from './core'
 
 // --- Ranking ---
-export function useRanking(period: string, periodKey: string) {
-  return useApiCall(() => gamificationApi.getRanking(period, periodKey), [period, periodKey], 'ranking')
+export function useRanking(period: string, periodKey: string, includeContratFinie?: boolean) {
+  return useApiCall(() => gamificationApi.getRanking(period, periodKey, includeContratFinie), [period, periodKey, includeContratFinie], 'ranking')
 }
 
 export function useCommercialRankings(commercialId: number) {
