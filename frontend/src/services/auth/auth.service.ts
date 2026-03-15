@@ -139,6 +139,31 @@ export class AuthService {
   }
 
   /**
+   * Vérifie si la session est récupérable : soit le token est valide,
+   * soit un refresh token existe et le refresh réussit.
+   * Contrairement à isAuthenticated() (synchrone), cette méthode async
+   * tente un refresh si l'access token est expiré.
+   */
+  async ensureAuthenticated(): Promise<boolean> {
+    if (this.isAuthenticated()) return true
+
+    const refreshToken = this.getRefreshToken()
+    if (!refreshToken) return false
+
+    const result = await this.refreshToken()
+    return result !== null
+  }
+
+  /**
+   * Vérifie si une session existe (token valide OU refresh token disponible).
+   * Check synchrone et permissif — utilisé pour les redirections de route
+   * afin de ne pas rediriger vers /login pendant qu'un refresh est possible.
+   */
+  hasSession(): boolean {
+    return this.isAuthenticated() || this.getRefreshToken() !== null
+  }
+
+  /**
    * Récupère l'expiration du token (timestamp en secondes)
    */
   getTokenExpiration(): number | null {
@@ -212,7 +237,6 @@ export class AuthService {
     if (token && this.isAuthenticated()) {
       graphqlClient.setAuthToken(token)
 
-      // Programmer le refresh en fonction du temps restant
       const exp = this.getTokenExpiration()
       if (exp) {
         const remainingSeconds = exp - Math.floor(Date.now() / 1000)
@@ -220,6 +244,21 @@ export class AuthService {
           this.scheduleTokenRefresh(remainingSeconds)
         }
       }
+    } else if (this.getRefreshToken()) {
+      // Access token expiré mais refresh token dispo — tenter un refresh silencieux
+      // au lieu de tout wiper (cas typique : retour sur l'app après background tab)
+      this.refreshToken()
+        .then(result => {
+          if (result) {
+            graphqlClient.setAuthToken(result.access_token)
+            window.dispatchEvent(new Event('auth-changed'))
+          } else {
+            this.clearAuthData()
+          }
+        })
+        .catch(() => {
+          this.clearAuthData()
+        })
     } else {
       this.clearAuthData()
     }

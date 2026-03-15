@@ -1,17 +1,25 @@
 import { useState } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, Clock, User, Calendar, MessageSquare, Mic, DoorOpen, ChevronDown, ChevronUp } from 'lucide-react'
+import {
+  Loader2,
+  Clock,
+  User,
+  Calendar,
+  MessageSquare,
+  Mic,
+  DoorOpen,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react'
 import { getStatusLabel, getStatusColor } from '@/constants/domain/porte-status'
 import { usePorte, useRecordingSegmentsByPorte } from '@/hooks/metier/use-api'
 import PorteHistoriqueTimeline from '../immeubles/components/PorteHistoriqueTimeline'
-import { SpeechScoreBar, formatDuration } from '@/pages-ADMIN-DIRECTEUR/ecoutes/EnregistrementComponents'
+import {
+  SpeechScoreBar,
+  formatDuration,
+} from '@/pages-ADMIN-DIRECTEUR/ecoutes/EnregistrementComponents'
 import AudioPlayer from '@/components/AudioPlayer'
 
 function SegmentCard({ segment }) {
@@ -37,7 +45,9 @@ function SegmentCard({ segment }) {
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground tabular-nums">
           <Clock className="h-3 w-3 shrink-0" />
-          <span>{dateStr} à {timeStr}</span>
+          <span>
+            {dateStr} à {timeStr}
+          </span>
           {duration && (
             <>
               <span className="text-muted-foreground/50">·</span>
@@ -51,15 +61,11 @@ function SegmentCard({ segment }) {
               {getStatusLabel(segment.statut)}
             </Badge>
           )}
-          {segment.speechScore != null && (
-            <SpeechScoreBar score={segment.speechScore} />
-          )}
+          {segment.speechScore != null && <SpeechScoreBar score={segment.speechScore} />}
         </div>
       </div>
 
-      {segment.streamingUrl && (
-        <AudioPlayer src={segment.streamingUrl} />
-      )}
+      {segment.streamingUrl && <AudioPlayer src={segment.streamingUrl} />}
 
       {segment.transcription && (
         <div className="bg-muted/40 rounded-lg p-2.5 border border-border/40">
@@ -76,9 +82,13 @@ function SegmentCard({ segment }) {
                   className="mt-1 text-[11px] text-primary hover:underline flex items-center gap-0.5"
                 >
                   {expanded ? (
-                    <>Voir moins <ChevronUp className="h-3 w-3" /></>
+                    <>
+                      Voir moins <ChevronUp className="h-3 w-3" />
+                    </>
                   ) : (
-                    <>Voir plus <ChevronDown className="h-3 w-3" /></>
+                    <>
+                      Voir plus <ChevronDown className="h-3 w-3" />
+                    </>
                   )}
                 </button>
               )}

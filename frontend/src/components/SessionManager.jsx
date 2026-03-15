@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { authService } from '@/services/auth'
 import { useRole } from '@/contexts/userole'
 
-const IDLE_TIMEOUT = 30 * 60 * 1000 // 30 minutes
+const IDLE_TIMEOUT = 24 * 60 * 60 * 1000 // 24 heures
 const CHECK_INTERVAL = 60 * 1000 // 1 minute
 const REFRESH_THRESHOLD = 5 * 60 * 1000 // 5 minutes
 

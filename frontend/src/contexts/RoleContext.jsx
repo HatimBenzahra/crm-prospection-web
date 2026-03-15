@@ -47,7 +47,7 @@ export const RoleProvider = ({ children }) => {
     const publicRoutes = ['/login', '/unauthorized']
     const isPublicRoute = publicRoutes.some(route => location.pathname.startsWith(route))
 
-    if (!isPublicRoute && !authService.isAuthenticated()) {
+    if (!isPublicRoute && !authService.hasSession()) {
       navigate('/login', { replace: true })
       setIsInitialLoading(false)
     } else if (isPublicRoute) {
@@ -156,16 +156,20 @@ export const RoleProvider = ({ children }) => {
   )
 
   useEffect(() => {
-    const checkAuthStatus = () => {
+    const checkAuthStatus = async () => {
       if (authService.isRefreshing) return
 
       const currentlyAuthenticated = authService.isAuthenticated()
       if (currentlyAuthenticated !== isAuthenticated) {
-        setIsAuthenticated(currentlyAuthenticated)
         if (!currentlyAuthenticated) {
+          const recovered = await authService.ensureAuthenticated()
+          if (recovered) return
+          setIsAuthenticated(false)
           setCurrentRole(null)
           setCurrentUserId(null)
           setSentryUser(null)
+        } else {
+          setIsAuthenticated(true)
         }
       }
     }
@@ -173,6 +177,7 @@ export const RoleProvider = ({ children }) => {
     const handleUnauthorized = () => {
       if (authService.isRefreshing) return
 
+      authService.logout()
       setIsAuthenticated(false)
       setCurrentRole(null)
       setCurrentUserId(null)
@@ -208,7 +213,18 @@ export const RoleProvider = ({ children }) => {
           })
         } catch (error) {
           console.error('Erreur récupération user info:', error)
-          // En cas d'erreur, déconnecter l'utilisateur
+          const recovered = await authService.ensureAuthenticated()
+          if (recovered) {
+            try {
+              const retryInfo = await api.auth.getMe()
+              setCurrentUserId(retryInfo.id)
+              setCurrentRole(retryInfo.role)
+              setSentryUser({ id: retryInfo.id.toString(), role: retryInfo.role })
+              return
+            } catch {
+              // noop — refresh OK mais getMe échoue encore
+            }
+          }
           logout()
         }
       } else {
