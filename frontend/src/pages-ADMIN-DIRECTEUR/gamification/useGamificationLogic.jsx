@@ -128,7 +128,8 @@ export function useGamificationLogic() {
   const { mutate: seedBadgesMut, loading: seedBadgesLoading } = useSeedBadges()
   const { mutate: confirmMappingMut, loading: confirmMappingLoading } = useConfirmMapping()
   const { mutate: updatePointsMut, loading: updatePointsLoading } = useUpdateOffrePoints()
-  const { mutate: updateBadgeKeyMut, loading: updateBadgeKeyLoading } = useUpdateOffreBadgeProductKey()
+  const { mutate: updateBadgeKeyMut, loading: updateBadgeKeyLoading } =
+    useUpdateOffreBadgeProductKey()
   const { mutate: removeMappingMut, loading: removeMappingLoading } = useRemoveMapping()
 
   // --- Badges filtrés ---
@@ -164,101 +165,151 @@ export function useGamificationLogic() {
   const handleComputeRanking = useCallback(async () => {
     try {
       const result = await computeRanking({ period: rankPeriod, periodKey })
-      setSyncResults(prev => ({ ...prev, ranking: { success: true, message: result.message || 'Classement recalculé' } }))
+      setSyncResults(prev => ({
+        ...prev,
+        ranking: { success: true, message: result.message || 'Classement recalculé' },
+      }))
       refetchRanking()
     } catch (err) {
-      setSyncResults(prev => ({ ...prev, ranking: { success: false, message: err.message || 'Erreur' } }))
+      setSyncResults(prev => ({
+        ...prev,
+        ranking: { success: false, message: err.message || 'Erreur' },
+      }))
     }
   }, [computeRanking, rankPeriod, periodKey, refetchRanking])
 
   const handleSyncOffres = useCallback(async () => {
     try {
       const result = await syncOffresMut()
-      setSyncResults(prev => ({ ...prev, offres: { success: true, message: `${result.created} créées, ${result.updated} mises à jour` } }))
+      setSyncResults(prev => ({
+        ...prev,
+        offres: {
+          success: true,
+          message: `${result.created} créées, ${result.updated} mises à jour`,
+        },
+      }))
       refetchOffres()
     } catch (err) {
-      setSyncResults(prev => ({ ...prev, offres: { success: false, message: err.message || 'Erreur' } }))
+      setSyncResults(prev => ({
+        ...prev,
+        offres: { success: false, message: err.message || 'Erreur' },
+      }))
     }
   }, [syncOffresMut, refetchOffres])
 
   const handleSyncContrats = useCallback(async () => {
     try {
       const result = await syncContratsMut()
-      setSyncResults(prev => ({ ...prev, contrats: { success: true, message: `${result.created} créés, ${result.updated} mis à jour, ${result.skipped} ignorés` } }))
+      setSyncResults(prev => ({
+        ...prev,
+        contrats: {
+          success: true,
+          message: `${result.created} créés, ${result.updated} mis à jour, ${result.skipped} ignorés`,
+        },
+      }))
     } catch (err) {
-      setSyncResults(prev => ({ ...prev, contrats: { success: false, message: err.message || 'Erreur' } }))
+      setSyncResults(prev => ({
+        ...prev,
+        contrats: { success: false, message: err.message || 'Erreur' },
+      }))
     }
   }, [syncContratsMut])
 
   const handleEvaluateBadges = useCallback(async () => {
     try {
       const result = await evaluateBadgesMut()
-      setSyncResults(prev => ({ ...prev, badges: { success: true, message: `${result.awarded} badges attribués` } }))
+      setSyncResults(prev => ({
+        ...prev,
+        badges: { success: true, message: `${result.awarded} badges attribués` },
+      }))
       refetchBadges()
     } catch (err) {
-      setSyncResults(prev => ({ ...prev, badges: { success: false, message: err.message || 'Erreur' } }))
+      setSyncResults(prev => ({
+        ...prev,
+        badges: { success: false, message: err.message || 'Erreur' },
+      }))
     }
   }, [evaluateBadgesMut, refetchBadges])
 
   const handleSeedBadges = useCallback(async () => {
     try {
       const result = await seedBadgesMut()
-      setSyncResults(prev => ({ ...prev, seed: { success: true, message: `${result.created} créés, ${result.skipped} existants` } }))
+      setSyncResults(prev => ({
+        ...prev,
+        seed: { success: true, message: `${result.created} créés, ${result.skipped} existants` },
+      }))
       refetchBadges()
     } catch (err) {
-      setSyncResults(prev => ({ ...prev, seed: { success: false, message: err.message || 'Erreur' } }))
+      setSyncResults(prev => ({
+        ...prev,
+        seed: { success: false, message: err.message || 'Erreur' },
+      }))
     }
   }, [seedBadgesMut, refetchBadges])
 
-  const handleConfirmMapping = useCallback(async (suggestion) => {
-    try {
-      await confirmMappingMut([{
-        prowinId: suggestion.prowinId,
-        winleadPlusId: suggestion.winleadPlusId,
-        type: suggestion.prowinType,
-      }])
-      refetchMapping()
-    } catch (err) {
-      console.error('Erreur lors de la confirmation du mapping:', err)
-    }
-  }, [confirmMappingMut, refetchMapping])
-
-  const handleRemoveMapping = useCallback(async (suggestion) => {
-    try {
-      await removeMappingMut({
-        prowinId: suggestion.prowinId,
-        type: suggestion.prowinType,
-      })
-      refetchMapping()
-    } catch (err) {
-      console.error('Erreur lors de la suppression du mapping:', err)
-    }
-  }, [removeMappingMut, refetchMapping])
-
-  const handleUpdateOffrePoints = useCallback(async (offreId, points) => {
-    try {
-      const normalizedPoints = parseInt(points, 10)
-      if (!Number.isFinite(normalizedPoints)) {
-        return
+  const handleConfirmMapping = useCallback(
+    async suggestion => {
+      try {
+        await confirmMappingMut([
+          {
+            prowinId: suggestion.prowinId,
+            winleadPlusId: suggestion.winleadPlusId,
+            type: suggestion.prowinType,
+          },
+        ])
+        refetchMapping()
+      } catch (err) {
+        console.error('Erreur lors de la confirmation du mapping:', err)
       }
+    },
+    [confirmMappingMut, refetchMapping]
+  )
 
-      await updatePointsMut({ offreId, points: Math.max(0, normalizedPoints) })
-      setEditingOffre(null)
-      refetchOffres()
-    } catch (err) {
-      console.error('Erreur lors de la mise à jour des points:', err)
-    }
-  }, [updatePointsMut, refetchOffres])
+  const handleRemoveMapping = useCallback(
+    async suggestion => {
+      try {
+        await removeMappingMut({
+          prowinId: suggestion.prowinId,
+          type: suggestion.prowinType,
+        })
+        refetchMapping()
+      } catch (err) {
+        console.error('Erreur lors de la suppression du mapping:', err)
+      }
+    },
+    [removeMappingMut, refetchMapping]
+  )
 
-  const handleUpdateBadgeProductKey = useCallback(async (offreId, badgeProductKey) => {
-    try {
-      const normalizedValue = badgeProductKey === 'NONE' ? undefined : badgeProductKey
-      await updateBadgeKeyMut({ offreId, badgeProductKey: normalizedValue })
-      refetchOffres()
-    } catch (err) {
-      console.error('Erreur lors de la mise à jour de la clé badge:', err)
-    }
-  }, [updateBadgeKeyMut, refetchOffres])
+  const handleUpdateOffrePoints = useCallback(
+    async (offreId, points) => {
+      try {
+        const normalizedPoints = parseInt(points, 10)
+        if (!Number.isFinite(normalizedPoints)) {
+          return
+        }
+
+        await updatePointsMut({ offreId, points: Math.max(0, normalizedPoints) })
+        setEditingOffre(null)
+        refetchOffres()
+      } catch (err) {
+        console.error('Erreur lors de la mise à jour des points:', err)
+      }
+    },
+    [updatePointsMut, refetchOffres]
+  )
+
+  const handleUpdateBadgeProductKey = useCallback(
+    async (offreId, badgeProductKey) => {
+      try {
+        const normalizedValue = badgeProductKey === 'NONE' ? undefined : badgeProductKey
+        await updateBadgeKeyMut({ offreId, badgeProductKey: normalizedValue })
+        refetchOffres()
+      } catch (err) {
+        console.error('Erreur lors de la mise à jour de la clé badge:', err)
+      }
+    },
+    [updateBadgeKeyMut, refetchOffres]
+  )
 
   // --- États combinés ---
   const loading = rankingLoading || offresLoading || badgesLoading || mappingLoading

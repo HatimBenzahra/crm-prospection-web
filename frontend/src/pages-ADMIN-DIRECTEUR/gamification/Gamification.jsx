@@ -610,6 +610,7 @@ function DetailModal({
   isManager,
   periodKey,
 }) {
+  const [activeSection, setActiveSection] = useState('badges')
   const { data: contratsCommercial, loading: loadingContrats } = useContratsByCommercial(
     commercialId || 0
   )
@@ -658,179 +659,277 @@ function DetailModal({
     [contrats]
   )
 
+  const badgesByCategory = useMemo(() => {
+    const grouped = {}
+    for (const b of badges) {
+      const cat = b.badgeDefinition?.category || 'AUTRE'
+      if (!grouped[cat]) grouped[cat] = []
+      grouped[cat].push(b)
+    }
+    return grouped
+  }, [badges])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[1480px] h-[640px] max-w-[calc(100vw-1.5rem)] sm:max-w-[1480px]! p-0 gap-0 overflow-hidden">
-        {/* Header */}
-        <div className="px-6 pt-5 pb-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div
-              className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${getInitialColors(displayPrenom)}`}
-            >
-              {displayPrenom.charAt(0)}
-              {displayNom.charAt(0)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold truncate">
-                  {displayPrenom} {displayNom}
-                </span>
-                <Badge variant="outline" className="text-[10px] shrink-0">
-                  {isManager ? 'Manager' : 'Commercial'}
-                </Badge>
+      <DialogContent className="w-full max-w-[calc(100vw-2rem)] sm:max-w-2xl lg:max-w-4xl xl:max-w-5xl p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
+        <DialogHeader className="sr-only">
+          <DialogTitle>
+            {displayPrenom} {displayNom}
+          </DialogTitle>
+          <DialogDescription>Fiche du participant</DialogDescription>
+        </DialogHeader>
+
+        <div className="px-5 pt-5 pb-4 border-b border-border shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div
+                className={`h-11 w-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${getInitialColors(displayPrenom)}`}
+              >
+                {displayPrenom.charAt(0)}
+                {displayNom.charAt(0)}
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">{periodKey}</p>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-base truncate">
+                    {displayPrenom} {displayNom}
+                  </span>
+                  <Badge variant="outline" className="text-[10px] shrink-0">
+                    {isManager ? 'Manager' : 'Commercial'}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{periodKey}</p>
+              </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {badges.length > 0 && (
-                <span className="inline-flex items-center rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-700 tabular-nums dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-400">
-                  <Shield className="h-3 w-3 mr-1" />
+
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <div className="flex items-center gap-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2.5 py-1.5">
+                <Shield className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-bold text-amber-700 dark:text-amber-400 tabular-nums">
                   {badges.length}
                 </span>
-              )}
-              {contrats.length > 0 && (
-                <span className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700 tabular-nums dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400">
-                  <FileText className="h-3 w-3 mr-1" />
+                <span className="text-[10px] text-amber-600/70 dark:text-amber-500">badges</span>
+              </div>
+              <div className="flex items-center gap-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1.5">
+                <FileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
                   {contrats.length}
                 </span>
-              )}
-              {totalPoints > 0 && (
-                <span className="inline-flex items-center rounded-md bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-bold text-sky-700 tabular-nums dark:bg-sky-950/30 dark:border-sky-800 dark:text-sky-400">
-                  {totalPoints} pts
+                <span className="text-[10px] text-emerald-600/70 dark:text-emerald-500">
+                  contrats
                 </span>
-              )}
+              </div>
+              <div className="flex items-center gap-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 px-2.5 py-1.5">
+                <Star className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+                <span className="text-xs font-bold text-sky-700 dark:text-sky-400 tabular-nums">
+                  {totalPoints}
+                </span>
+                <span className="text-[10px] text-sky-600/70 dark:text-sky-500">pts</span>
+              </div>
             </div>
+          </div>
+
+          <div className="flex items-center gap-1 mt-4 border-b border-transparent -mb-4">
+            {[
+              { id: 'badges', label: 'Badges', icon: Shield, count: badges.length },
+              { id: 'contrats', label: 'Contrats', icon: FileText, count: contrats.length },
+            ].map(tab => (
+              <button
+                type="button"
+                key={tab.id}
+                onClick={() => setActiveSection(tab.id)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
+                  activeSection === tab.id
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <tab.icon className="h-3.5 w-3.5" />
+                {tab.label}
+                <span
+                  className={`ml-0.5 tabular-nums rounded-full px-1.5 py-px text-[10px] ${
+                    activeSection === tab.id
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Body */}
-        <div className="h-[560px] overflow-hidden">
+        <div className="flex-1 overflow-y-auto min-h-0">
           {loading ? (
-            <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+            <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
               <RefreshCw className="h-4 w-4 animate-spin mr-2" />
               Chargement...
             </div>
           ) : badges.length === 0 && contrats.length === 0 ? (
-            <div className="flex flex-col items-center py-12 text-muted-foreground">
-              <Trophy className="h-7 w-7 mb-2 opacity-40" />
-              <p className="text-sm">Aucune activité sur cette période</p>
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <div className="p-3 rounded-full bg-muted/50 mb-3">
+                <Trophy className="h-6 w-6 opacity-40" />
+              </div>
+              <p className="text-sm font-medium">Aucune activité</p>
+              <p className="text-xs mt-1">Aucun badge ou contrat sur cette période</p>
+            </div>
+          ) : activeSection === 'badges' ? (
+            <div className="p-5 space-y-5">
+              {Object.keys(badgesByCategory).length > 0 ? (
+                Object.entries(badgesByCategory).map(([category, catBadges]) => {
+                  const style = CATEGORY_BADGE_STYLES[category] || CATEGORY_BADGE_STYLES.PROGRESSION
+                  return (
+                    <div key={category}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className={`p-1 rounded-md ${style.bg}`}>
+                          <style.Icon className={`h-3.5 w-3.5 ${style.color}`} />
+                        </div>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          {category}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                          ({catBadges.length})
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {catBadges.map(badge => {
+                          const def = badge.badgeDefinition
+                          const badgeStyle =
+                            CATEGORY_BADGE_STYLES[def?.category] ||
+                            CATEGORY_BADGE_STYLES.PROGRESSION
+                          const trigger = getBadgeTriggerLabel(def?.condition, badge.metadata)
+                          const iconUrl = def ? resolveBadgeIconUrl(def) : null
+                          return (
+                            <div
+                              key={badge.id}
+                              className={`group rounded-lg border border-border/70 hover:border-border p-3 transition-colors ${getCategoryAccent(def?.category)} border-t-2`}
+                            >
+                              <div className="flex items-start gap-2.5">
+                                <div
+                                  className={`h-8 w-8 rounded-lg border ${badgeStyle.bg} ${badgeStyle.border} flex items-center justify-center shrink-0 overflow-hidden`}
+                                >
+                                  {iconUrl ? (
+                                    <img
+                                      src={iconUrl}
+                                      alt=""
+                                      aria-hidden="true"
+                                      className="h-5 w-5 object-contain"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <badgeStyle.Icon
+                                      className={`h-3.5 w-3.5 ${badgeStyle.color}`}
+                                    />
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-medium truncate leading-tight">
+                                    {def?.nom || 'Badge'}
+                                  </p>
+                                  {trigger && (
+                                    <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2 leading-tight">
+                                      {trigger}
+                                    </p>
+                                  )}
+                                  <span className="text-[10px] text-muted-foreground/70">
+                                    {formatDate(badge.awardedAt)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Shield className="h-5 w-5 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">Aucun badge obtenu</p>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="grid grid-cols-[0.95fr_1.25fr] h-full">
-              <div className="px-5 py-3 border-r border-border h-full overflow-y-auto">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  <Shield className="h-3.5 w-3.5 inline mr-1.5 -mt-px" />
-                  Badges obtenus ({badges.length})
-                </p>
-                {badges.length > 0 ? (
-                  <div className="space-y-2">
-                    {badges.map(badge => {
-                      const def = badge.badgeDefinition
-                      const style =
-                        CATEGORY_BADGE_STYLES[def?.category] || CATEGORY_BADGE_STYLES.PROGRESSION
-                      const trigger = getBadgeTriggerLabel(def?.condition, badge.metadata)
-                      const iconUrl = def ? resolveBadgeIconUrl(def) : null
-                      return (
-                        <div
-                          key={badge.id}
-                          className="rounded-lg border border-border/70 p-3 space-y-2"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`h-9 w-9 rounded-lg border ${style.bg} ${style.border} flex items-center justify-center shrink-0 overflow-hidden`}
-                            >
-                              {iconUrl ? (
-                                <img
-                                  src={iconUrl}
-                                  alt=""
-                                  aria-hidden="true"
-                                  className="h-6 w-6 object-contain"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <style.Icon className={`h-4 w-4 ${style.color}`} />
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium truncate">{def?.nom || 'Badge'}</p>
-                              <span className="text-[10px] text-muted-foreground">
-                                {formatDate(badge.awardedAt)}
-                              </span>
-                            </div>
-                          </div>
-                          {trigger && <p className="text-xs text-muted-foreground">{trigger}</p>}
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getCategoryBadgeClass(def?.category)}`}
-                          >
-                            {def?.category}
-                          </span>
+            <div className="p-5">
+              {contrats.length > 0 ? (
+                <div className="space-y-2">
+                  {contrats.map(contrat => (
+                    <div
+                      key={contrat.id}
+                      className="flex items-center gap-3 rounded-lg border border-border/70 hover:border-border p-3 transition-colors group"
+                    >
+                      {contrat.offreLogoUrl ? (
+                        <img
+                          src={getOffreLogoUrl(contrat.offreLogoUrl)}
+                          alt=""
+                          aria-hidden="true"
+                          className="h-10 w-10 rounded-lg border border-border/50 object-contain bg-muted/30 p-1 shrink-0"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-lg border border-border/50 bg-muted/30 flex items-center justify-center shrink-0">
+                          <Package className="h-4 w-4 text-muted-foreground" />
                         </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground py-3">Aucun badge obtenu</p>
-                )}
-              </div>
-
-              <div className="px-5 py-3 h-full overflow-y-auto">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  <FileText className="h-3.5 w-3.5 inline mr-1.5 -mt-px" />
-                  Contrats validés ({contrats.length})
-                </p>
-                {contrats.length > 0 ? (
-                  <div className="space-y-2">
-                    {contrats.map(contrat => (
-                      <div
-                        key={contrat.id}
-                        className="flex items-start gap-3 rounded-lg border border-border/70 p-3"
-                      >
-                        {contrat.offreLogoUrl ? (
-                          <img
-                            src={getOffreLogoUrl(contrat.offreLogoUrl)}
-                            alt=""
-                            aria-hidden="true"
-                            className="h-9 w-9 rounded-lg border border-border/50 object-contain bg-muted/50 p-1 shrink-0"
-                          />
-                        ) : (
-                          <div className="h-9 w-9 rounded-lg border border-border/50 bg-muted/50 flex items-center justify-center shrink-0">
-                            <Package className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {contrat.offreNom || 'Offre inconnue'}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate mt-0.5">
-                            {[contrat.offreCategorie, contrat.offreFournisseur]
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </p>
-                        </div>
-                        <div className="shrink-0 text-right text-xs space-y-1">
-                          <div className="flex items-center justify-end gap-1 text-muted-foreground">
-                            <Calendar className="h-3 w-3" />
-                            {formatDate(contrat.dateValidation)}
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {contrat.offreNom || 'Offre inconnue'}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                          {[contrat.offreCategorie, contrat.offreFournisseur]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      </div>
+                      <div className="hidden sm:flex items-center gap-3 shrink-0">
+                        <div className="text-right text-xs">
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <CheckCircle className="h-3 w-3 text-emerald-500" />
+                            <span>{formatDate(contrat.dateValidation)}</span>
                           </div>
                           {contrat.dateSignature && (
-                            <div className="flex items-center justify-end gap-1 text-muted-foreground">
+                            <div className="flex items-center gap-1 text-muted-foreground mt-0.5">
                               <Pen className="h-3 w-3" />
-                              {formatDate(contrat.dateSignature)}
+                              <span>{formatDate(contrat.dateSignature)}</span>
                             </div>
                           )}
-                          {contrat.offrePoints > 0 && (
-                            <span className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200 px-1.5 py-px text-[10px] font-semibold text-emerald-700 tabular-nums dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400">
-                              {contrat.offrePoints} pts
-                            </span>
-                          )}
                         </div>
+                        {contrat.offrePoints > 0 && (
+                          <span className="inline-flex items-center rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
+                            +{contrat.offrePoints}
+                          </span>
+                        )}
                       </div>
-                    ))}
+                      <div className="flex sm:hidden items-center gap-1.5 shrink-0">
+                        {contrat.offrePoints > 0 && (
+                          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                            +{contrat.offrePoints}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatDate(contrat.dateValidation)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="flex items-center justify-end pt-2 border-t border-border/50 mt-3">
+                    <div className="flex items-center gap-1.5 text-sm">
+                      <span className="text-muted-foreground">Total :</span>
+                      <span className="font-bold tabular-nums">{totalPoints} pts</span>
+                      <span className="text-muted-foreground mx-1">·</span>
+                      <span className="text-muted-foreground tabular-nums">
+                        {contrats.length} contrat{contrats.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground py-3">Aucun contrat validé</p>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-5 w-5 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">Aucun contrat validé</p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -969,7 +1068,9 @@ function ClassementTab({
                   onClick={() => setIncludeContratFinie(prev => !prev)}
                   className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${includeContratFinie ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`}
                 >
-                  <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow-lg ring-0 transition duration-200 ease-in-out ${includeContratFinie ? 'translate-x-4' : 'translate-x-0'}`} />
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow-lg ring-0 transition duration-200 ease-in-out ${includeContratFinie ? 'translate-x-4' : 'translate-x-0'}`}
+                  />
                 </button>
               </div>
               <Button
@@ -1479,7 +1580,6 @@ function OffresTab({
   handleUpdateOffrePoints,
   handleUpdateBadgeProductKey,
   updatePointsLoading,
-  updateBadgeKeyLoading,
 }) {
   const [editPoints, setEditPoints] = useState('')
 
@@ -1886,7 +1986,7 @@ export default function Gamification() {
     if (logic.activeTab !== routeTab) {
       logic.setActiveTab(routeTab)
     }
-  }, [logic.activeTab, logic.setActiveTab, routeTab])
+  }, [logic, routeTab])
 
   const handleTabChange = tabId => {
     const targetPath = TAB_PATHS[tabId] || TAB_PATHS.classement
