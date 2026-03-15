@@ -48,6 +48,7 @@ function currentMonthKey() {
 
 export function useDashboardLogic() {
   const [currentRdvPage, setCurrentRdvPage] = useState(1)
+  const [selectedPorteId, setSelectedPorteId] = useState(null)
   const [segmentFilter, setSegmentFilter] = useState(
     () => sessionStorage.getItem('dashboard-segment-filter') || 'TOUS'
   )
@@ -170,6 +171,8 @@ export function useDashboardLogic() {
     paginatedRdv,
     currentRdvPage,
     setCurrentRdvPage,
+    selectedPorteId,
+    setSelectedPorteId,
     isLoading,
     segments,
     segmentsLoading,

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useDashboardLogic } from './useDashboardLogic'
+import PorteDetailModal from './PorteDetailModal'
 
 function buildMonthOptions() {
   const options = []
@@ -446,6 +447,8 @@ export default function Dashboard() {
     paginatedRdv,
     currentRdvPage,
     setCurrentRdvPage,
+    selectedPorteId,
+    setSelectedPorteId,
     isLoading,
     segments,
     segmentsLoading,
@@ -627,30 +630,50 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="divide-y">
+                <div className="divide-y divide-border/40">
                   {paginatedRdv.items.map(porte => {
                     const immeuble = immeubles?.find(imm => imm.id === porte.immeubleId)
                     return (
                       <button
                         type="button"
                         key={porte.id}
-                        onClick={() =>
-                          navigate(`/immeubles/${porte.immeubleId}/portes/${porte.id}`)
-                        }
-                        className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-primary/[0.03] transition-colors"
+                        onClick={() => setSelectedPorteId(porte.id)}
+                        className="group flex items-start gap-3 w-full px-4 py-3.5 text-left hover:bg-muted/30 transition-colors"
                       >
-                        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-blue-500/10 text-blue-500 shrink-0">
-                          <Calendar className="h-4 w-4" />
+                        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary/10 text-primary shrink-0 mt-0.5">
+                          <DoorOpen className="h-4 w-4" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium">Porte {porte.numero}</div>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {immeuble?.adresse}
-                          </p>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[13px] font-semibold leading-none truncate">
+                              {immeuble?.adresse || '—'} — Porte {porte.numero}
+                              {porte.etage != null && (
+                                <span className="ml-1 text-[11px] font-normal text-muted-foreground">· Ét. {porte.etage}</span>
+                              )}
+                            </span>
+                            <span className="text-[13px] font-bold tabular-nums text-primary shrink-0">
+                              {porte.rdvTime || '—'}
+                            </span>
+                          </div>
+                          {porte.nomPersonnalise && (
+                            <p className="text-[12px] text-muted-foreground truncate leading-none">
+                              {porte.nomPersonnalise}
+                            </p>
+                          )}
+                          <div className="flex items-center justify-between gap-2 pt-0.5">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <Badge className={`text-[10px] px-1.5 py-0 leading-5 font-medium border-0 ${getStatusColor(porte.statut)}`}>
+                                {getStatusLabel(porte.statut)}
+                              </Badge>
+                              {immeuble?.commercial && (
+                                <span className="text-[11px] text-muted-foreground truncate">
+                                  {immeuble.commercial.prenom} {immeuble.commercial.nom}
+                                </span>
+                              )}
+                            </div>
+                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                          </div>
                         </div>
-                        <span className="text-sm font-medium tabular-nums text-primary shrink-0">
-                          {porte.rdvTime || '—'}
-                        </span>
                       </button>
                     )
                   })}
@@ -691,6 +714,21 @@ export default function Dashboard() {
       <Top3PerfCard mode={perfMode} setMode={setPerfMode} top3={top3} loading={rankingLoading} />
 
       <ActiveZonesSlider_Dashboard assignments={assignments || []} />
+
+      <PorteDetailModal
+        open={selectedPorteId !== null}
+        onOpenChange={open => {
+          if (!open) setSelectedPorteId(null)
+        }}
+        porteId={selectedPorteId}
+        immeuble={
+          selectedPorteId
+            ? immeubles?.find(imm =>
+                rdvToday?.find(p => p.id === selectedPorteId)?.immeubleId === imm.id
+              )
+            : null
+        }
+      />
     </div>
   )
 }
