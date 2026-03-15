@@ -174,7 +174,9 @@ export class EvaluationService {
 
     // Timing: heures des contrats validés aujourd'hui
     const todayContrats = allContrats.filter((c) => c.periodDay === currentDay);
-    const todayHours = todayContrats.map((c) => c.dateValidation.getHours());
+    const todayHours = todayContrats
+      .filter((c) => c.dateValidation !== null)
+      .map((c) => c.dateValidation!.getHours());
 
     // Champs spécifiques commercial (source: StatusHistorique + Statistic)
     let portesParJour = 0;
