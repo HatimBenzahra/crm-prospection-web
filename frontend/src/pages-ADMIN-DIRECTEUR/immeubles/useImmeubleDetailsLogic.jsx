@@ -1,8 +1,8 @@
 import { useParams, Link } from 'react-router-dom'
 import { useImmeuble, useCommercials, useManagers, useInfinitePortesByImmeuble } from '@/services'
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { Mic } from 'lucide-react'
+import { CalendarDays, Mic } from 'lucide-react'
 import { getStatusLabel, getStatusColor } from '@/constants/domain/porte-status'
 import { porteApi } from '@/services/api/portes/porte.service'
 
@@ -76,18 +76,14 @@ export function useImmeubleDetailsLogic() {
             doors: portesEtage.map(porte => ({
               id: porte.id,
               number: porte.numero,
+              nomPersonnalise: porte.nomPersonnalise || null,
               status: porte.statut.toLowerCase(),
-              rdvDate: porte.rdvDate
-                ? new Date(porte.rdvDate).toLocaleDateString('fr-FR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                  })
-                : null,
+              rdvDate: porte.rdvDate || null,
               rdvTime: porte.rdvTime || null,
               comment: porte.commentaire || null,
-              lastVisit: porte.updatedAt ? new Date(porte.updatedAt).toLocaleDateString() : null,
+              lastVisit: porte.updatedAt || null,
               nbRepassages: porte.nbRepassages || 0,
+              nbContrats: porte.nbContrats || 0,
             })),
           }
         })
@@ -118,15 +114,53 @@ export function useImmeubleDetailsLogic() {
       floor.doors.forEach(door => {
         allDoors.push({
           ...door,
-          floor: floor.floor,
+          floor: Number(floor.floor),
+          floorLabel: `Étage ${floor.floor}`,
           porteId: door.id, // ID de la base de données pour l'historique
           tableId: `${floor.floor}-${door.number}`, // Clé unique pour le tableau React
           etage: `Étage ${floor.floor}`,
+          rdvTimestamp: door.rdvDate ? new Date(door.rdvDate).getTime() : null,
+          lastVisitTimestamp: door.lastVisit ? new Date(door.lastVisit).getTime() : null,
         })
       })
     })
     return allDoors
   }, [immeubleData?.floorDetails])
+
+  const formatRelativeDate = useCallback(dateValue => {
+    if (!dateValue) return null
+    const date = new Date(dateValue)
+    if (Number.isNaN(date.getTime())) return null
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const target = new Date(date)
+    target.setHours(0, 0, 0, 0)
+
+    const diffDays = Math.round((today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) return "Aujourd'hui"
+    if (diffDays === 1) return 'Hier'
+    if (diffDays > 1 && diffDays < 7) return `Il y a ${diffDays}j`
+    if (diffDays < 0) return `Dans ${Math.abs(diffDays)}j`
+
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+    })
+  }, [])
+
+  const formatDateLabel = useCallback(dateValue => {
+    if (!dateValue) return null
+    const date = new Date(dateValue)
+    if (Number.isNaN(date.getTime())) return null
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  }, [])
 
   const personalInfo = useMemo(() => {
     if (!immeubleData) return []
@@ -202,19 +236,28 @@ export function useImmeubleDetailsLogic() {
         sortable: true,
         className: 'font-medium',
         cell: row => (
-          <Link
-            to={`/immeubles/${id}/portes/${row.porteId}`}
-            className="text-primary hover:underline font-medium"
-          >
-            {row.number}
-          </Link>
+          <div className="leading-tight">
+            <Link
+              to={`/immeubles/${id}/portes/${row.porteId}`}
+              className="text-primary hover:underline font-medium text-[13px]"
+            >
+              {row.number}
+            </Link>
+            {row.nomPersonnalise && (
+              <div className="text-[11px] text-muted-foreground mt-1 truncate" title={row.nomPersonnalise}>
+                {row.nomPersonnalise}
+              </div>
+            )}
+          </div>
         ),
       },
       {
         header: 'Étage',
         accessor: 'etage',
+        sortKey: 'floor',
         sortable: true,
-        className: 'text-sm',
+        className: 'text-[13px] tabular-nums',
+        cell: row => <span className="tabular-nums">{row.floorLabel || row.etage}</span>,
       },
       {
         header: 'Statut',
@@ -226,19 +269,23 @@ export function useImmeubleDetailsLogic() {
           const label = getStatusLabel(normalizedStatus)
           const colorClasses = getStatusColor(normalizedStatus)
 
-          return <Badge className={colorClasses}>{label}</Badge>
+          return <Badge className={`${colorClasses} text-[10px]`}>{label}</Badge>
         },
       },
       {
         header: 'RDV',
-        accessor: 'rdvDate',
+        accessor: 'rdvTimestamp',
         sortable: true,
         cell: row => {
           if (row.rdvDate && row.rdvTime) {
+            const formattedDate = formatDateLabel(row.rdvDate)
             return (
-              <div className="text-sm">
-                <div>{row.rdvDate}</div>
-                <div className="text-muted-foreground">{row.rdvTime}</div>
+              <div className="inline-flex items-center gap-2 rounded bg-primary/5 px-2 py-1">
+                <CalendarDays className="h-3.5 w-3.5 text-primary/70" />
+                <div className="text-[13px] tabular-nums leading-tight">
+                  <div>{formattedDate}</div>
+                  <div className="text-muted-foreground">{row.rdvTime}</div>
+                </div>
               </div>
             )
           }
@@ -246,10 +293,45 @@ export function useImmeubleDetailsLogic() {
         },
       },
       {
-        header: 'Dernière visite',
-        accessor: 'lastVisit',
+        header: 'Repassages',
+        accessor: 'nbRepassages',
         sortable: true,
-        cell: row => row.lastVisit || <span className="text-muted-foreground">-</span>,
+        className: 'text-[13px] tabular-nums',
+        cell: row => {
+          const repassages = row.nbRepassages || 0
+          const indicatorClass =
+            repassages >= 3
+              ? 'bg-red-500/80'
+              : repassages >= 1
+                ? 'bg-amber-500/80'
+                : 'bg-muted-foreground/30'
+
+          return (
+            <div className="inline-flex items-center gap-2 tabular-nums">
+              <span className={`h-2 w-2 rounded-full ${indicatorClass}`} />
+              <span>{repassages}</span>
+            </div>
+          )
+        },
+      },
+      {
+        header: 'Contrats',
+        accessor: 'nbContrats',
+        sortable: true,
+        className: 'text-[13px] tabular-nums',
+        cell: row => <span className="tabular-nums">{row.nbContrats || 0}</span>,
+      },
+      {
+        header: 'Dernière visite',
+        accessor: 'lastVisitTimestamp',
+        sortable: true,
+        cell: row => {
+          const formatted = formatRelativeDate(row.lastVisit)
+          if (!formatted) {
+            return <span className="text-muted-foreground">-</span>
+          }
+          return <span className="text-[12px] tabular-nums text-muted-foreground">{formatted}</span>
+        },
       },
       {
         header: 'Audio',
@@ -273,9 +355,11 @@ export function useImmeubleDetailsLogic() {
         accessor: 'comment',
         cell: row => {
           if (row.comment) {
+            const truncatedComment =
+              row.comment.length > 60 ? `${row.comment.slice(0, 60).trim()}...` : row.comment
             return (
-              <div className="max-w-xs text-sm wrap-break-word whitespace-normal">
-                {row.comment}
+              <div className="max-w-xs text-sm wrap-break-word whitespace-normal" title={row.comment}>
+                {truncatedComment}
               </div>
             )
           }
@@ -283,7 +367,7 @@ export function useImmeubleDetailsLogic() {
         },
       },
     ],
-    [id, porteSegmentCounts]
+    [id, porteSegmentCounts, formatDateLabel, formatRelativeDate]
   )
 
   const additionalSections = useMemo(

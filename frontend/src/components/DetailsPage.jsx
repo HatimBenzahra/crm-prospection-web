@@ -70,35 +70,83 @@ function DoorsTableContent({
 }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [floorFilter, setFloorFilter] = useState('all')
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [currentPage, setCurrentPage] = useState(1)
   const [expandedRows, setExpandedRows] = useState(new Set())
   const itemsPerPage = 20
 
+  const availableFloors = useMemo(() => {
+    const floors = data
+      .map(item => Number(item.floor))
+      .filter(floor => Number.isFinite(floor))
+    return Array.from(new Set(floors)).sort((a, b) => a - b)
+  }, [data])
+
+  const baseFilteredData = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+
+    return data.filter(item => {
+      const floorMatch =
+        floorFilter === 'all' ||
+        (Number.isFinite(Number(item.floor)) && Number(item.floor) === Number(floorFilter))
+
+      if (!floorMatch) return false
+      if (!normalizedSearch) return true
+
+      const searchableValues = [item[searchKey], item.number, item.etage, item.comment]
+      return searchableValues.some(value =>
+        value != null && String(value).toLowerCase().includes(normalizedSearch)
+      )
+    })
+  }, [data, floorFilter, searchKey, searchTerm])
+
+  const statusCounts = useMemo(() => {
+    return baseFilteredData.reduce((acc, item) => {
+      const status = item.status
+      if (status) {
+        acc.set(status, (acc.get(status) || 0) + 1)
+      }
+      return acc
+    }, new Map())
+  }, [baseFilteredData])
+
   // Filtrage et tri des données
   const filteredAndSortedData = useMemo(() => {
-    let filtered = data.filter(item => {
-      const searchMatch = item[searchKey]?.toLowerCase().includes(searchTerm.toLowerCase())
-      // Si l'élément a une propriété 'status', on check. Sinon, on ignore le filtre statut pour cet item (ex: immeuble sans statut de porte)
-      // Ou on check si statusFilter correspond.
-      const statusMatch = statusFilter === 'all' || item.status === statusFilter
-      return searchMatch && statusMatch
+    const filtered = baseFilteredData.filter(
+      item => statusFilter === 'all' || item.status === statusFilter
+    )
+
+    if (!sortConfig.key) return filtered
+
+    const sorted = [...filtered]
+    sorted.sort((a, b) => {
+      const aValue = a[sortConfig.key]
+      const bValue = b[sortConfig.key]
+      const aIsNull = aValue == null || aValue === ''
+      const bIsNull = bValue == null || bValue === ''
+
+      if (aIsNull && bIsNull) return 0
+      if (aIsNull) return sortConfig.direction === 'asc' ? 1 : -1
+      if (bIsNull) return sortConfig.direction === 'asc' ? -1 : 1
+
+      const aNumber = Number(aValue)
+      const bNumber = Number(bValue)
+      const isNumeric = Number.isFinite(aNumber) && Number.isFinite(bNumber)
+
+      if (isNumeric) {
+        return sortConfig.direction === 'asc' ? aNumber - bNumber : bNumber - aNumber
+      }
+
+      const comparison = String(aValue).localeCompare(String(bValue), 'fr', {
+        numeric: true,
+        sensitivity: 'base',
+      })
+      return sortConfig.direction === 'asc' ? comparison : -comparison
     })
 
-    if (sortConfig.key) {
-      filtered.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
-          return sortConfig.direction === 'asc' ? -1 : 1
-        }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
-          return sortConfig.direction === 'asc' ? 1 : -1
-        }
-        return 0
-      })
-    }
-
-    return filtered
-  }, [data, searchTerm, sortConfig, statusFilter, searchKey])
+    return sorted
+  }, [baseFilteredData, sortConfig, statusFilter])
 
   // Pagination
   const totalPages = Math.ceil(filteredAndSortedData.length / itemsPerPage)
@@ -106,12 +154,16 @@ function DoorsTableContent({
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     return filteredAndSortedData.slice(startIndex, endIndex)
-  }, [filteredAndSortedData, currentPage, itemsPerPage])
+  }, [filteredAndSortedData, currentPage])
+
+  const filtersSignature = `${searchTerm}|${statusFilter}|${floorFilter}`
 
   // Réinitialise la page quand on change de filtre/recherche
   useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm, statusFilter])
+    if (filtersSignature) {
+      setCurrentPage(1)
+    }
+  }, [filtersSignature])
 
   const handleSort = key => {
     setSortConfig(prevConfig => ({
@@ -136,36 +188,85 @@ function DoorsTableContent({
     <div className="space-y-4">
       {/* Barre de filtres */}
       {showFilters && (
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={searchPlaceholder}
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="pl-8"
-            />
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={searchPlaceholder}
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-8 rounded-lg"
+              />
+            </div>
+
+            {availableFloors.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="justify-between min-w-[150px] rounded-lg">
+                    <span className="inline-flex items-center gap-2">
+                      <Filter className="h-4 w-4" />
+                      {floorFilter === 'all' ? 'Tous les étages' : `Étage ${floorFilter}`}
+                    </span>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Filtrer par étage</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setFloorFilter('all')}>
+                    Tous les étages
+                  </DropdownMenuItem>
+                  {availableFloors.map(floor => (
+                    <DropdownMenuItem key={floor} onClick={() => setFloorFilter(String(floor))}>
+                      Étage {floor}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {(searchTerm || statusFilter !== 'all' || floorFilter !== 'all') && (
+              <Button
+                variant="ghost"
+                className="rounded-lg"
+                onClick={() => {
+                  setSearchTerm('')
+                  setStatusFilter('all')
+                  setFloorFilter('all')
+                }}
+              >
+                Réinitialiser les filtres
+              </Button>
+            )}
           </div>
 
           {customStatusFilter && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Filter className="mr-2 h-4 w-4" />
-                  Statut
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Filtrer par statut</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {customStatusFilter.map(filter => (
-                  <DropdownMenuItem key={filter.value} onClick={() => setStatusFilter(filter.value)}>
-                    {filter.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              {customStatusFilter.map(filter => {
+                const isActive = statusFilter === filter.value
+                const count = filter.value === 'all' ? baseFilteredData.length : (statusCounts.get(filter.value) || 0)
+
+                return (
+                  <Button
+                    key={filter.value}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setStatusFilter(filter.value)}
+                    className={`h-8 rounded-full border px-3 text-xs font-medium whitespace-nowrap ${
+                      isActive
+                        ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/15'
+                        : 'bg-background text-muted-foreground border-border/60 hover:bg-muted/40'
+                    }`}
+                  >
+                    <span>{filter.label}</span>
+                    <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-[10px] leading-none text-foreground/80">
+                      {count}
+                    </span>
+                  </Button>
+                )
+              })}
+            </div>
           )}
         </div>
       )}
@@ -180,15 +281,15 @@ function DoorsTableContent({
                 {columns.map((column, index) => (
                   <TableHead
                     key={index}
-                    className={`${column.className || ''} ${column.sortable ? 'cursor-pointer hover:bg-muted' : ''}`}
-                    onClick={() => column.sortable && handleSort(column.accessor)}
-                  >
-                    <div className="flex items-center">
-                      {column.header}
-                      {column.sortable && sortConfig.key === column.accessor && (
-                        <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </div>
+                      className={`${column.className || ''} ${column.sortable ? 'cursor-pointer hover:bg-muted' : ''}`}
+                      onClick={() => column.sortable && handleSort(column.sortKey || column.accessor)}
+                    >
+                      <div className="flex items-center">
+                        {column.header}
+                        {column.sortable && sortConfig.key === (column.sortKey || column.accessor) && (
+                          <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
                   </TableHead>
                 ))}
               </TableRow>
@@ -267,17 +368,15 @@ function DoorsTableContent({
           </Table>
         </div>
       </div>
-
-
       {/* Footer avec pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            Affichage de {(currentPage - 1) * itemsPerPage + 1} à{' '}
-            {Math.min(currentPage * itemsPerPage, filteredAndSortedData.length)} sur{' '}
-            {filteredAndSortedData.length} résultats
-          </div>
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          {filteredAndSortedData.length === data.length
+            ? `${filteredAndSortedData.length} résultats`
+            : `${filteredAndSortedData.length} sur ${data.length} résultats`}
+        </div>
 
+        {totalPages > 1 && (
           <Pagination>
             <PaginationContent>
               <PaginationItem>
@@ -327,8 +426,8 @@ function DoorsTableContent({
               </PaginationItem>
             </PaginationContent>
           </Pagination>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
