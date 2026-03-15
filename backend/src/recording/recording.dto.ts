@@ -76,6 +76,35 @@ export class ConfirmRecordingUploadInput {
 
   @Field({ nullable: true })
   duration?: number;
+
+  @Field(() => [DoorSegmentInput], { nullable: true })
+  doorSegments?: DoorSegmentInput[];
+}
+
+@InputType()
+export class DoorSegmentInput {
+  @Field(() => Int) porteId: number;
+  @Field() numero: string;
+  @Field(() => Int) etage: number;
+  @Field(() => Float) startTime: number;
+  @Field(() => Float) endTime: number;
+  @Field({ nullable: true }) statut?: string;
+}
+
+@ObjectType()
+export class RecordingSegmentDto {
+  @Field(() => Int) id: number;
+  @Field(() => Int) porteId: number;
+  @Field({ nullable: true }) s3KeySegment?: string;
+  @Field({ nullable: true }) statut?: string;
+  @Field(() => Float) startTime: number;
+  @Field(() => Float) endTime: number;
+  @Field(() => Float) durationSec: number;
+  @Field({ nullable: true }) transcription?: string;
+  @Field(() => Int, { nullable: true }) speechScore?: number;
+  @Field() status: string;
+  @Field({ nullable: true }) streamingUrl?: string;
+  @Field() createdAt: Date;
 }
 
 @ObjectType()

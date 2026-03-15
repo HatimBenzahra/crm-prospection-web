@@ -27,6 +27,7 @@ const CommercialDetails = lazy(() => import('@/pages-ADMIN-DIRECTEUR/commercial/
 const ManagerDetails = lazy(() => import('@/pages-ADMIN-DIRECTEUR/managers/ManagerDetails'))
 const DirecteurDetails = lazy(() => import('@/pages-ADMIN-DIRECTEUR/directeurs/DirecteurDetails'))
 const ImmeubleDetails = lazy(() => import('@/pages-ADMIN-DIRECTEUR/immeubles/ImmeubleDetails'))
+const PorteDetails = lazy(() => import('@/pages-ADMIN-DIRECTEUR/immeubles/PorteDetails'))
 const ZoneDetails = lazy(() => import('@/pages-ADMIN-DIRECTEUR/zones/ZoneDetails'))
 const GPSTracking = lazy(() => import('@/pages-ADMIN-DIRECTEUR/gps-tracking/GPSTracking'))
 const EcouteLive = lazy(() => import('@/pages-ADMIN-DIRECTEUR/ecoutes/EcouteLive'))
@@ -67,6 +68,7 @@ function AdminLayout() {
     managers: { label: 'Managers', href: '/managers' },
     directeurs: { label: 'Directeurs', href: '/directeurs' },
     immeubles: { label: 'Immeubles', href: '/immeubles' },
+    portes: { label: 'Porte', href: '' },
     zones: { label: 'Zones', href: '/zones' },
     gestion: { label: 'Gestion', href: '/gestion' },
     'gps-tracking': { label: 'Suivi GPS', href: '/gps-tracking' },
@@ -209,6 +211,14 @@ function AdminLayout() {
                     element={
                       <SectionErrorBoundary>
                         <ImmeubleDetails />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/immeubles/:id/portes/:porteId"
+                    element={
+                      <SectionErrorBoundary>
+                        <PorteDetails />
                       </SectionErrorBoundary>
                     }
                   />

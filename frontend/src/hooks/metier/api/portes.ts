@@ -239,6 +239,36 @@ export function useStatusHistoriqueByPorte(porteId: number | null): UseApiState<
   }
 }
 
+export function useRecordingSegmentsByPorte(porteId: number | null): UseApiState<any[]> & UseApiActions {
+  const [data, setData] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchData = useCallback(async () => {
+    if (!porteId) {
+      setData([])
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await api.portes.getRecordingSegments(porteId)
+      setData(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur chargement segments')
+    } finally {
+      setLoading(false)
+    }
+  }, [porteId])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  return { data, loading, error, refetch: fetchData }
+}
+
 export function useStatusHistoriqueByImmeuble(immeubleId: number | null): UseApiState<any[]> & UseApiActions {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)

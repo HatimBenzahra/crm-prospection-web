@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useImmeuble, useCommercials, useManagers, useInfinitePortesByImmeuble } from '@/services'
 import { useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
@@ -128,7 +128,8 @@ export function useImmeubleDetailsLogic() {
       {
         title: 'RDV programmés',
         value: immeubleData.floorDetails.reduce(
-          (acc, floor) => acc + floor.doors.filter(door => door.status === 'rendez_vous_pris').length,
+          (acc, floor) =>
+            acc + floor.doors.filter(door => door.status === 'rendez_vous_pris').length,
           0
         ),
         description: 'Rendez-vous à venir',
@@ -172,6 +173,14 @@ export function useImmeubleDetailsLogic() {
         accessor: 'number',
         sortable: true,
         className: 'font-medium',
+        cell: row => (
+          <Link
+            to={`/immeubles/${id}/portes/${row.porteId}`}
+            className="text-primary hover:underline font-medium"
+          >
+            {row.number}
+          </Link>
+        ),
       },
       {
         header: 'Étage',
@@ -220,14 +229,16 @@ export function useImmeubleDetailsLogic() {
         cell: row => {
           if (row.comment) {
             return (
-              <div className="max-w-xs text-sm wrap-break-word whitespace-normal">{row.comment}</div>
+              <div className="max-w-xs text-sm wrap-break-word whitespace-normal">
+                {row.comment}
+              </div>
             )
           }
           return <span className="text-muted-foreground">-</span>
         },
       },
     ],
-    []
+    [id]
   )
 
   const additionalSections = useMemo(

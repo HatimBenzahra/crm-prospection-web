@@ -121,6 +121,7 @@ input ConfirmMappingInput {
 }
 
 input ConfirmRecordingUploadInput {
+  doorSegments: [DoorSegmentInput!]
   duration: Float
   s3Key: String!
 }
@@ -265,6 +266,15 @@ type Directeur {
   statistics: [Statistic!]
   status: UserStatus!
   updatedAt: DateTime!
+}
+
+input DoorSegmentInput {
+  endTime: Float!
+  etage: Int!
+  numero: String!
+  porteId: Int!
+  startTime: Float!
+  statut: String
 }
 
 type EgressState {
@@ -591,6 +601,7 @@ type Query {
   portesModifiedToday(immeubleId: Int): [Porte!]!
   portesRdvToday: [Porte!]!
   ranking(period: RankPeriod!, periodKey: String!): [RankSnapshotType!]!
+  recordingSegmentsByPorte(porteId: Int!): [RecordingSegmentDto!]!
   statistic(id: Int!): Statistic!
   statistics(commercialId: Int): [Statistic!]!
   statsTimelineByCommercial(commercialId: Int!, endDate: DateTime, startDate: DateTime): [TimelinePoint!]!
@@ -647,6 +658,21 @@ type RecordingResult {
   s3Key: String!
   status: String!
   url: String
+}
+
+type RecordingSegmentDto {
+  createdAt: DateTime!
+  durationSec: Float!
+  endTime: Float!
+  id: Int!
+  porteId: Int!
+  s3KeySegment: String
+  speechScore: Int
+  startTime: Float!
+  status: String!
+  statut: String
+  streamingUrl: String
+  transcription: String
 }
 
 type RecordingUploadDetails {

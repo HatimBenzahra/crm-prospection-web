@@ -4,6 +4,10 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { execFile } from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { EgressClient } from 'livekit-server-sdk';
 import {
   EncodedFileOutput,
@@ -18,6 +22,9 @@ import {
   HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { promisify } from 'util';
+import { pipeline } from 'stream/promises';
+import { Readable } from 'stream';
 import {
   RecordingResult,
   RecordingItem,
@@ -26,6 +33,7 @@ import {
   RequestRecordingUploadInput,
   RecordingUploadDetails,
   ConfirmRecordingUploadInput,
+  RecordingSegmentDto,
 } from './recording.dto';
 import { PrismaService } from '../prisma.service';
 import { TranscriptionService } from '../transcription/transcription.service';
@@ -35,6 +43,9 @@ type RoomTarget = {
   type: 'COMMERCIAL' | 'MANAGER';
   id: number;
 };
+
+const execFileAsync = promisify(execFile);
+const FFMPEG_MAX_BUFFER = 10 * 1024 * 1024;
 
 @Injectable()
 export class RecordingService {
@@ -49,6 +60,8 @@ export class RecordingService {
   private readonly prefix = process.env.S3_PREFIX || 'recordings/';
   private readonly awsAccessKey = process.env.AWS_ACCESS_KEY_ID!;
   private readonly awsSecretKey = process.env.AWS_SECRET_ACCESS_KEY!;
+  private readonly whisperUrl = process.env.WHISPER_API_URL;
+  private readonly whisperTimeoutMs = 300_000;
 
   // EgressClient needs HTTP(S) URL, convert if WSS provided
   private readonly egress = new EgressClient(
@@ -214,6 +227,21 @@ export class RecordingService {
       return null;
     }
     return safeRoom.replace(/_/g, ':');
+  }
+
+  private extractImmeubleIdFromKey(key: string): number | undefined {
+    const match = key.match(/(?:^|\/|_)immeuble[-_](\d+)(?:_|\/|\.|$)/i);
+    if (!match) {
+      return undefined;
+    }
+    const immeubleId = Number(match[1]);
+    return Number.isFinite(immeubleId) ? immeubleId : undefined;
+  }
+
+  private buildSegmentKey(originalKey: string, porteId: number, startTime: number): string {
+    const originalWithoutExt = originalKey.replace(/\.[^/.]+$/u, '');
+    const safeStartTime = Number(startTime.toFixed(3)).toString().replace(/\./g, '_');
+    return `${originalWithoutExt}_porte_${porteId}_${safeStartTime}s.mp4`;
   }
 
   private async signedUrlOrUndefined(key: string): Promise<string | undefined> {
@@ -487,7 +515,7 @@ export class RecordingService {
     input: ConfirmRecordingUploadInput,
     currentUser: { id: number; role: string },
   ): Promise<RecordingItem> {
-    const { s3Key, duration } = input;
+    const { s3Key, duration, doorSegments } = input;
 
     const roomName = this.extractRoomFromKey(s3Key);
     if (roomName) {
@@ -506,6 +534,56 @@ export class RecordingService {
 
     void this.transcription.processRecording(s3Key);
 
+    const validSegments =
+      doorSegments?.filter(
+        (segment) =>
+          Number.isFinite(segment.startTime) &&
+          Number.isFinite(segment.endTime) &&
+          segment.endTime > segment.startTime,
+      ) ?? [];
+
+    if (validSegments.length > 0) {
+      const roomTarget = roomName
+        ? this.parseRoomIdentifier(roomName)
+        : null;
+      const createdAfter = new Date();
+      const commercialId = roomTarget?.type === 'COMMERCIAL' ? roomTarget.id : null;
+      const managerId = roomTarget?.type === 'MANAGER' ? roomTarget.id : null;
+      const immeubleId = this.extractImmeubleIdFromKey(s3Key) ?? null;
+
+      await this.prisma.recordingSegment.createMany({
+        data: validSegments.map((segment) => ({
+          porteId: segment.porteId,
+          commercialId,
+          managerId,
+          immeubleId,
+          statut: segment.statut as any ?? null,
+          s3KeyOriginal: s3Key,
+          startTime: segment.startTime,
+          endTime: segment.endTime,
+          durationSec: segment.endTime - segment.startTime,
+        })),
+      });
+
+      const createdSegments = await this.prisma.recordingSegment.findMany({
+        where: {
+          s3KeyOriginal: s3Key,
+          status: 'PENDING',
+          createdAt: { gte: createdAfter },
+          OR: validSegments.map((segment) => ({
+            porteId: segment.porteId,
+            startTime: segment.startTime,
+            endTime: segment.endTime,
+          })),
+        },
+        orderBy: { id: 'desc' },
+      });
+
+      if (createdSegments.length > 0) {
+        void this.processSegments(s3Key, createdSegments);
+      }
+    }
+
     const url = await this.signedUrlOrUndefined(s3Key);
 
     return {
@@ -514,6 +592,246 @@ export class RecordingService {
       lastModified: head.LastModified,
       url,
     };
+  }
+
+  async getSegmentsByPorte(
+    porteId: number,
+    currentUser: { id: number; role: string },
+  ): Promise<RecordingSegmentDto[]> {
+    if (currentUser.role !== 'admin' && currentUser.role !== 'directeur') {
+      throw new ForbiddenException('Access denied to recording segments');
+    }
+
+    if (currentUser.role === 'directeur') {
+      const porte = await this.prisma.porte.findUnique({
+        where: { id: porteId },
+        select: {
+          immeuble: {
+            select: {
+              manager: { select: { directeurId: true } },
+              commercial: { select: { directeurId: true } },
+            },
+          },
+        },
+      });
+
+      if (!porte) {
+        throw new NotFoundException('Porte not found');
+      }
+
+      const managerDirecteurId = porte.immeuble.manager?.directeurId;
+      const commercialDirecteurId = porte.immeuble.commercial?.directeurId;
+
+      if (
+        managerDirecteurId !== currentUser.id &&
+        commercialDirecteurId !== currentUser.id
+      ) {
+        throw new ForbiddenException('Access denied to recording segments');
+      }
+    }
+
+    const segments = await this.prisma.recordingSegment.findMany({
+      where: { porteId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const withUrls = await Promise.all(
+      segments.map(async (segment) => ({
+        ...segment,
+        streamingUrl: segment.s3KeySegment
+          ? await this.signedUrlOrUndefined(segment.s3KeySegment)
+          : undefined,
+      })),
+    );
+
+    return withUrls.map((segment) => ({
+      id: segment.id,
+      porteId: segment.porteId,
+      s3KeySegment: segment.s3KeySegment ?? undefined,
+      statut: segment.statut ?? undefined,
+      startTime: segment.startTime,
+      endTime: segment.endTime,
+      durationSec: segment.durationSec,
+      transcription: segment.transcription ?? undefined,
+      speechScore: segment.speechScore ?? undefined,
+      status: segment.status,
+      streamingUrl: segment.streamingUrl,
+      createdAt: segment.createdAt,
+    }));
+  }
+
+  private async processSegments(
+    originalS3Key: string,
+    segments: Array<{
+      id: number;
+      porteId: number;
+      startTime: number;
+      endTime: number;
+    }>,
+  ): Promise<void> {
+    const tmpDir = path.join(
+      os.tmpdir(),
+      `recording-segments-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    );
+    const originalFilePath = path.join(tmpDir, 'original.mp4');
+
+    try {
+      fs.mkdirSync(tmpDir, { recursive: true });
+      const downloaded = await this.downloadFromS3(originalS3Key, originalFilePath);
+      if (!downloaded) {
+        for (const segment of segments) {
+          await this.prisma.recordingSegment.update({
+            where: { id: segment.id },
+            data: { status: 'FAILED' },
+          });
+        }
+        return;
+      }
+
+      for (const segment of segments) {
+        const segmentFilePath = path.join(tmpDir, `segment-${segment.id}.mp4`);
+        const segmentS3Key = this.buildSegmentKey(
+          originalS3Key,
+          segment.porteId,
+          segment.startTime,
+        );
+
+        try {
+          await this.prisma.recordingSegment.update({
+            where: { id: segment.id },
+            data: { status: 'PROCESSING' },
+          });
+
+          await execFileAsync(
+            'ffmpeg',
+            [
+              '-y',
+              '-i',
+              originalFilePath,
+              '-ss',
+              String(segment.startTime),
+              '-to',
+              String(segment.endTime),
+              '-c',
+              'copy',
+              segmentFilePath,
+            ],
+            { maxBuffer: FFMPEG_MAX_BUFFER },
+          );
+
+          await this.uploadSegmentToS3(segmentFilePath, segmentS3Key);
+          const transcription = await this.transcribeSegment(segmentFilePath);
+
+          await this.prisma.recordingSegment.update({
+            where: { id: segment.id },
+            data: {
+              s3KeySegment: segmentS3Key,
+              transcription,
+              status: 'COMPLETED',
+            },
+          });
+        } catch (error) {
+          this.logger.error(
+            `Segment processing failed for segmentId=${segment.id}: ${error?.message || error}`,
+          );
+          await this.prisma.recordingSegment.update({
+            where: { id: segment.id },
+            data: { status: 'FAILED' },
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        `Unexpected error while processing segments for ${originalS3Key}: ${error?.message || error}`,
+      );
+      for (const segment of segments) {
+        await this.prisma.recordingSegment.update({
+          where: { id: segment.id },
+          data: { status: 'FAILED' },
+        });
+      }
+    } finally {
+      this.cleanupDir(tmpDir);
+    }
+  }
+
+  private async downloadFromS3(s3Key: string, outputPath: string): Promise<boolean> {
+    try {
+      const resp = await this.s3.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: s3Key }),
+      );
+
+      if (!resp.Body) {
+        return false;
+      }
+
+      const writeStream = fs.createWriteStream(outputPath);
+      await pipeline(resp.Body as Readable, writeStream);
+      return true;
+    } catch (error) {
+      this.logger.error(`Unable to download ${s3Key}: ${error?.message || error}`);
+      return false;
+    }
+  }
+
+  private async uploadSegmentToS3(filePath: string, s3Key: string): Promise<void> {
+    const stat = fs.statSync(filePath);
+    const stream = fs.createReadStream(filePath);
+
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: s3Key,
+        Body: stream,
+        ContentType: 'audio/mp4',
+        ContentLength: stat.size,
+      }),
+    );
+  }
+
+  private async transcribeSegment(filePath: string): Promise<string | undefined> {
+    if (!this.whisperUrl) {
+      return undefined;
+    }
+
+    const fileBuffer = fs.readFileSync(filePath);
+    const formData = new FormData();
+    formData.append(
+      'file',
+      new Blob([fileBuffer], { type: 'audio/mp4' }),
+      'segment.mp4',
+    );
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.whisperTimeoutMs);
+
+    try {
+      const response = await fetch(
+        `${this.whisperUrl}/transcribe/prospection?language=auto`,
+        {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Whisper responded with ${response.status} ${response.statusText}`);
+      }
+
+      const data = (await response.json()) as { text?: string };
+      return data.text?.trim() || undefined;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private cleanupDir(dirPath: string): void {
+    try {
+      if (fs.existsSync(dirPath)) {
+        fs.rmSync(dirPath, { recursive: true, force: true });
+      }
+    } catch {}
   }
 
   async getStreamingUrl(

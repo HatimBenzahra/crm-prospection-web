@@ -180,3 +180,21 @@ export const GET_STATUS_HISTORIQUE_BY_IMMEUBLE = `
     }
   }
 `
+
+export const GET_RECORDING_SEGMENTS_BY_PORTE = `
+  query RecordingSegmentsByPorte($porteId: Int!) {
+    recordingSegmentsByPorte(porteId: $porteId) {
+      id
+      porteId
+      statut
+      startTime
+      endTime
+      durationSec
+      transcription
+      speechScore
+      status
+      streamingUrl
+      createdAt
+    }
+  }
+`

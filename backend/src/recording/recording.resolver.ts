@@ -14,6 +14,7 @@ import {
   ExtractionQueueItemDto,
   SpeechScoreDto,
   PaginatedRecordingsResult,
+  RecordingSegmentDto,
 } from './recording.dto';
 import { RecordingService } from './recording.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -153,5 +154,14 @@ export class RecordingResolver {
     @CurrentUser() user: any,
   ): Promise<PaginatedRecordingsResult> {
     return this.svc.listAllRecordings(roomNames, user);
+  }
+
+  @Query(() => [RecordingSegmentDto])
+  @Roles('admin', 'directeur')
+  async recordingSegmentsByPorte(
+    @Args('porteId', { type: () => Int }) porteId: number,
+    @CurrentUser() user: any,
+  ): Promise<RecordingSegmentDto[]> {
+    return this.svc.getSegmentsByPorte(porteId, user);
   }
 }

@@ -12,6 +12,7 @@ import {
   GET_PORTES_RDV_TODAY,
   GET_STATUS_HISTORIQUE_BY_PORTE,
   GET_STATUS_HISTORIQUE_BY_IMMEUBLE,
+  GET_RECORDING_SEGMENTS_BY_PORTE,
 } from './porte.queries'
 import {
   CREATE_PORTE,
@@ -101,5 +102,10 @@ export const porteApi = {
   async getStatusHistoriqueByImmeuble(immeubleId: number): Promise<any[]> {
     const response = await gql<any, { immeubleId: number }>(GET_STATUS_HISTORIQUE_BY_IMMEUBLE, { immeubleId })
     return response.statusHistoriqueByImmeuble
+  },
+
+  async getRecordingSegments(porteId: number): Promise<any[]> {
+    const response = await gql<any, { porteId: number }>(GET_RECORDING_SEGMENTS_BY_PORTE, { porteId })
+    return response.recordingSegmentsByPorte
   },
 }

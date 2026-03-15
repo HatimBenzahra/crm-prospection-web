@@ -161,6 +161,7 @@ model Porte {
 
   immeuble          Immeuble  @relation(fields: [immeubleId], references: [id])
   statusHistorique  StatusHistorique[]
+  recordingSegments RecordingSegment[]
 
   @@unique([immeubleId, numero])
 }
@@ -410,4 +411,38 @@ model ContratValide {
   @@index([periodMonth])
   @@index([periodQuarter])
   @@index([periodYear])
+}
+
+model RecordingSegment {
+  id            Int           @id @default(autoincrement())
+  porteId       Int
+  commercialId  Int?
+  managerId     Int?
+  immeubleId    Int?
+  statut        StatutPorte?
+  s3KeyOriginal String
+  s3KeySegment  String?
+  startTime     Float
+  endTime       Float
+  durationSec   Float
+  transcription String?
+  speechScore   Int?
+  status        SegmentStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  porte         Porte         @relation(fields: [porteId], references: [id], onDelete: Cascade)
+
+  @@index([porteId])
+  @@index([commercialId])
+  @@index([immeubleId])
+  @@index([s3KeyOriginal])
+  @@index([status])
+}
+
+enum SegmentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
 }
