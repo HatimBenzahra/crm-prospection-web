@@ -182,4 +182,14 @@ export class RecordingResolver {
   ): Promise<RecordingSegmentDto[]> {
     return this.svc.getSegmentsByImmeuble(immeubleId, user);
   }
+
+  @Query(() => [RecordingSegmentDto])
+  @Roles('admin', 'directeur')
+  async recordingSegmentsToday(
+    @Args('statut', { nullable: true }) statut: string,
+    @Args('limit', { type: () => Int, defaultValue: 20 }) limit: number,
+    @CurrentUser() user: any,
+  ): Promise<RecordingSegmentDto[]> {
+    return this.svc.getSegmentsToday(statut, limit, user);
+  }
 }

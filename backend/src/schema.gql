@@ -610,6 +610,7 @@ type Query {
   recordingSegmentsByImmeuble(immeubleId: Int!): [RecordingSegmentDto!]!
   recordingSegmentsByKey(s3Key: String!): [RecordingSegmentDto!]!
   recordingSegmentsByPorte(porteId: Int!): [RecordingSegmentDto!]!
+  recordingSegmentsToday(limit: Int! = 20, statut: String): [RecordingSegmentDto!]!
   statistic(id: Int!): Statistic!
   statistics(commercialId: Int): [Statistic!]!
   statsTimelineByCommercial(commercialId: Int!, endDate: DateTime, startDate: DateTime): [TimelinePoint!]!
@@ -669,11 +670,13 @@ type RecordingResult {
 }
 
 type RecordingSegmentDto {
+  commercialNom: String
   createdAt: DateTime!
   durationSec: Float!
   endTime: Float!
   id: Int!
   immeubleAdresse: String
+  immeubleId: Int
   porteEtage: Int
   porteId: Int!
   porteNumero: String

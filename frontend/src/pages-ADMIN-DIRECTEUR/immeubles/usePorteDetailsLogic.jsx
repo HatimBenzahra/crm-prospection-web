@@ -19,7 +19,7 @@ export function usePorteDetailsLogic() {
     parseInt(porteId)
   )
 
-  const goBack = () => navigate(`/immeubles/${immeubleId}`)
+  const goBack = () => navigate(-1)
 
   return {
     porte,

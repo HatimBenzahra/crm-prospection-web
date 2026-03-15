@@ -714,6 +714,68 @@ export class RecordingService {
     }));
   }
 
+  async getSegmentsToday(
+    statut: string | null,
+    limit: number,
+    currentUser: { id: number; role: string },
+  ): Promise<RecordingSegmentDto[]> {
+    if (currentUser.role !== 'admin' && currentUser.role !== 'directeur') {
+      throw new ForbiddenException('Access denied to recording segments');
+    }
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const where: any = {
+      createdAt: { gte: startOfDay },
+      status: 'COMPLETED',
+    };
+    if (statut) where.statut = statut;
+
+    const segments = await this.prisma.recordingSegment.findMany({
+      where,
+      include: {
+        porte: { select: { numero: true, etage: true, immeuble: { select: { id: true, adresse: true, commercial: { select: { nom: true, prenom: true } }, manager: { select: { nom: true, prenom: true } } } } } },
+      },
+      orderBy: { speechScore: 'desc' },
+      take: limit,
+    });
+
+    const withUrls = await Promise.all(
+      segments.map(async (segment) => ({
+        ...segment,
+        streamingUrl: segment.s3KeySegment
+          ? await this.signedUrlOrUndefined(segment.s3KeySegment)
+          : undefined,
+      })),
+    );
+
+    return withUrls.map((segment) => {
+      const comm = segment.porte.immeuble.commercial;
+      const mgr = segment.porte.immeuble.manager;
+      const commercialNom = comm ? `${comm.prenom} ${comm.nom}` : mgr ? `${mgr.prenom} ${mgr.nom}` : undefined;
+      return {
+      id: segment.id,
+      porteId: segment.porteId,
+      porteNumero: segment.porte.numero,
+      porteEtage: segment.porte.etage,
+      immeubleAdresse: segment.porte.immeuble.adresse,
+      commercialNom,
+      s3KeySegment: segment.s3KeySegment ?? undefined,
+      statut: segment.statut ?? undefined,
+      startTime: segment.startTime,
+      endTime: segment.endTime,
+      durationSec: segment.durationSec,
+      transcription: segment.transcription ?? undefined,
+      speechScore: segment.speechScore ?? undefined,
+      status: segment.status,
+      streamingUrl: segment.streamingUrl,
+      createdAt: segment.createdAt,
+      immeubleId: segment.porte.immeuble.id,
+    };
+    });
+  }
+
   async getSegmentsByImmeuble(
     immeubleId: number,
     currentUser: { id: number; role: string },

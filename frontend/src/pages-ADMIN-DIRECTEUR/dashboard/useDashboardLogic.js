@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   useCommercials,
   useManagers,
@@ -9,13 +9,36 @@ import {
   usePortesModifiedToday,
   usePortesRdvToday,
 } from '@/hooks/metier/use-api'
+import { gql } from '@/services/core/graphql'
+
+const GET_SEGMENTS_TODAY = `
+  query RecordingSegmentsToday($statut: String, $limit: Int) {
+    recordingSegmentsToday(statut: $statut, limit: $limit) {
+      id
+      porteId
+      porteNumero
+      porteEtage
+      immeubleAdresse
+      immeubleId
+      commercialNom
+      statut
+      durationSec
+      transcription
+      speechScore
+      status
+      streamingUrl
+      createdAt
+    }
+  }
+`
 
 export function useDashboardLogic() {
-  // État de pagination pour les rendez-vous
   const [currentRdvPage, setCurrentRdvPage] = useState(1)
+  const [segmentFilter, setSegmentFilter] = useState(() => sessionStorage.getItem('dashboard-segment-filter') || 'ARGUMENTE')
+  const [segments, setSegments] = useState([])
+  const [segmentsLoading, setSegmentsLoading] = useState(false)
   const ITEMS_PER_PAGE = 4
 
-  // Chargement des données
   const { data: commercials, loading: loadingCommercials } = useCommercials()
   const { data: managers, loading: loadingManagers } = useManagers()
   const { data: directeurs, loading: loadingDirecteurs } = useDirecteurs()
@@ -24,6 +47,23 @@ export function useDashboardLogic() {
   const { data: assignments, loading: loadingAssignments } = useAllCurrentAssignments()
   const { data: portesModifiedToday, loading: loadingPortesModified } = usePortesModifiedToday()
   const { data: rdvToday, loading: loadingRdvToday } = usePortesRdvToday()
+
+  const fetchSegments = useCallback(async (statut) => {
+    setSegmentsLoading(true)
+    try {
+      const response = await gql(GET_SEGMENTS_TODAY, { statut, limit: 15 })
+      setSegments(response.recordingSegmentsToday || [])
+    } catch {
+      setSegments([])
+    } finally {
+      setSegmentsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    sessionStorage.setItem('dashboard-segment-filter', segmentFilter || '')
+    fetchSegments(segmentFilter)
+  }, [segmentFilter, fetchSegments])
 
   const today = useMemo(() => {
     const d = new Date()
@@ -92,6 +132,10 @@ export function useDashboardLogic() {
     currentRdvPage,
     setCurrentRdvPage,
     isLoading,
+    segments,
+    segmentsLoading,
+    segmentFilter,
+    setSegmentFilter,
     data: {
       commercials,
       managers,
