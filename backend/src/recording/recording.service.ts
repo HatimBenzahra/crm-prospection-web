@@ -879,15 +879,27 @@ export class RecordingService {
 
           await this.uploadSegmentToS3(segmentFilePath, segmentS3Key);
           const transcription = await this.transcribeSegment(segmentFilePath);
+          const speechScore = await this.computeSpeechScore(segmentFilePath);
 
           await this.prisma.recordingSegment.update({
             where: { id: segment.id },
             data: {
               s3KeySegment: segmentS3Key,
               transcription,
+              speechScore,
               status: 'COMPLETED',
             },
           });
+
+          if (speechScore !== null) {
+            const duration = segment.endTime - segment.startTime;
+            const speechDurationSec = (speechScore / 100) * duration;
+            this.speechAnalysis.cacheFromWhisperSegments(
+              segmentS3Key,
+              [{ start: 0, end: speechDurationSec }],
+              duration,
+            );
+          }
         } catch (error) {
           this.logger.error(
             `Segment processing failed for segmentId=${segment.id}: ${error?.message || error}`,
@@ -910,6 +922,41 @@ export class RecordingService {
       }
     } finally {
       this.cleanupDir(tmpDir);
+    }
+  }
+
+  private async computeSpeechScore(filePath: string): Promise<number | null> {
+    try {
+      const { stdout } = await execFileAsync('ffprobe', [
+        '-v', 'quiet', '-print_format', 'json', '-show_format', filePath,
+      ]);
+      const totalDuration = parseFloat(JSON.parse(stdout)?.format?.duration ?? '0');
+      if (totalDuration <= 0) return null;
+
+      const { stderr } = await execFileAsync('ffmpeg', [
+        '-i', filePath,
+        '-af', 'silencedetect=n=-40dB:d=0.5',
+        '-f', 'null', '-',
+      ], { maxBuffer: FFMPEG_MAX_BUFFER });
+
+      let silenceDuration = 0;
+      const lines = stderr.split('\n');
+      let silenceStart: number | null = null;
+      for (const line of lines) {
+        const startMatch = line.match(/silence_start:\s*(\d+(?:\.\d+)?)/);
+        if (startMatch) { silenceStart = parseFloat(startMatch[1]); continue; }
+        const endMatch = line.match(/silence_end:\s*(\d+(?:\.\d+)?)/);
+        if (endMatch && silenceStart !== null) {
+          silenceDuration += parseFloat(endMatch[1]) - silenceStart;
+          silenceStart = null;
+        }
+      }
+
+      const speechDuration = Math.max(0, totalDuration - silenceDuration);
+      return Math.round(Math.min(100, (speechDuration / totalDuration) * 100));
+    } catch (error) {
+      this.logger.warn(`Speech score computation failed: ${error?.message || error}`);
+      return null;
     }
   }
 
