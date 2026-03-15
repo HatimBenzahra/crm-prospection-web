@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User2, Lock, Mail, Loader2, Eye, EyeOff } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeSwitchDarklight'
-import ThemeSelector from '@/components/Theme'
+
 import { authService } from '@/services/auth'
 import { useToast } from '@/components/ui/toast'
 import { logger as Logger } from '@/services/core'
@@ -73,7 +73,6 @@ export default function Login() {
 `}
 > {/* Boutons de thème en haut à droite */}
       <div className="fixed top-6 right-6 flex items-center gap-2 text-2xl">
-        <ThemeSelector />
         <ThemeToggle />
       </div>
 

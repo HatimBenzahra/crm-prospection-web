@@ -54,7 +54,7 @@ import { AppSidebar } from '@/components/sidebar'
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
 import ThemeToggle from '@/components/ThemeSwitchDarklight'
-import ThemeSelector from '@/components/Theme'
+
 import React from 'react'
 
 // Layout pour Admin/Directeur/Manager (avec sidebar)
@@ -135,7 +135,6 @@ function AdminLayout() {
                 </nav>
               </div>
               <div className="flex items-center gap-2 px-4">
-                <ThemeSelector />
                 <ThemeToggle />
               </div>
             </header>

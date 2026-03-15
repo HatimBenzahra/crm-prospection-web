@@ -164,17 +164,8 @@ export const initTheme = () => {
   document.documentElement.style.setProperty('--radius', themeColors.radius)
 
   // Vérifie s'il y a un preset sauvegardé
-  const savedPreset = localStorage.getItem('theme-preset')
+  applyPreset('crm', theme)
 
-  if (savedPreset) {
-    // Si un preset est sauvegardé, on l'applique
-    applyPreset(savedPreset, theme)
-  } else {
-    // Sinon on applique le thème par défaut
-    applyTheme(theme)
-  }
-
-  // Ajoute ou retire la classe 'dark' sur l'élément html
   if (theme === 'dark') {
     document.documentElement.classList.add('dark')
   } else {
@@ -194,16 +185,7 @@ export const toggleTheme = () => {
   // Applique le radius immédiatement pour éviter tout délai
   document.documentElement.style.setProperty('--radius', themeColors.radius)
 
-  // Vérifie s'il y a un preset sauvegardé
-  const savedPreset = localStorage.getItem('theme-preset')
-
-  if (savedPreset) {
-    // Si un preset est sauvegardé, on l'applique avec le nouveau mode
-    applyPreset(savedPreset, newTheme)
-  } else {
-    // Sinon on applique le thème par défaut
-    applyTheme(newTheme)
-  }
+  applyPreset('crm', newTheme)
 
   if (newTheme === 'dark') {
     document.documentElement.classList.add('dark')
