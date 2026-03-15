@@ -49,7 +49,7 @@ function currentMonthKey() {
 export function useDashboardLogic() {
   const [currentRdvPage, setCurrentRdvPage] = useState(1)
   const [segmentFilter, setSegmentFilter] = useState(
-    () => sessionStorage.getItem('dashboard-segment-filter') || 'ARGUMENTE'
+    () => sessionStorage.getItem('dashboard-segment-filter') || 'TOUS'
   )
   const [segments, setSegments] = useState([])
   const [segmentsLoading, setSegmentsLoading] = useState(false)
@@ -86,7 +86,7 @@ export function useDashboardLogic() {
 
   useEffect(() => {
     sessionStorage.setItem('dashboard-segment-filter', segmentFilter || '')
-    fetchSegments(segmentFilter)
+    fetchSegments(segmentFilter === 'TOUS' ? null : segmentFilter)
   }, [segmentFilter, fetchSegments])
 
   const today = useMemo(() => {

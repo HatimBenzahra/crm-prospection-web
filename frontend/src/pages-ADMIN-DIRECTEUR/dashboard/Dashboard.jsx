@@ -341,7 +341,7 @@ const SEGMENT_FILTERS = [
   { key: 'REFUS', label: 'Refus' },
   { key: 'CONTRAT_SIGNE', label: 'Contrats' },
   { key: 'RENDEZ_VOUS_PRIS', label: 'RDV' },
-  { key: null, label: 'Tous' },
+  { key: 'TOUS', label: 'Tous' },
 ]
 
 // eslint-disable-next-line no-unused-vars -- Icon is used as JSX component
