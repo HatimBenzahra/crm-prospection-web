@@ -549,7 +549,14 @@ export class RecordingService {
       const createdAfter = new Date();
       const commercialId = roomTarget?.type === 'COMMERCIAL' ? roomTarget.id : null;
       const managerId = roomTarget?.type === 'MANAGER' ? roomTarget.id : null;
-      const immeubleId = this.extractImmeubleIdFromKey(s3Key) ?? null;
+      let immeubleId = this.extractImmeubleIdFromKey(s3Key) ?? null;
+      if (!immeubleId && validSegments.length > 0) {
+        const firstPorte = await this.prisma.porte.findUnique({
+          where: { id: validSegments[0].porteId },
+          select: { immeubleId: true },
+        });
+        immeubleId = firstPorte?.immeubleId ?? null;
+      }
 
       await this.prisma.recordingSegment.createMany({
         data: validSegments.map((segment) => ({
@@ -647,6 +654,95 @@ export class RecordingService {
     return withUrls.map((segment) => ({
       id: segment.id,
       porteId: segment.porteId,
+      s3KeySegment: segment.s3KeySegment ?? undefined,
+      statut: segment.statut ?? undefined,
+      startTime: segment.startTime,
+      endTime: segment.endTime,
+      durationSec: segment.durationSec,
+      transcription: segment.transcription ?? undefined,
+      speechScore: segment.speechScore ?? undefined,
+      status: segment.status,
+      streamingUrl: segment.streamingUrl,
+      createdAt: segment.createdAt,
+    }));
+  }
+
+  async getSegmentsByKey(
+    s3Key: string,
+    currentUser: { id: number; role: string },
+  ): Promise<RecordingSegmentDto[]> {
+    if (currentUser.role !== 'admin' && currentUser.role !== 'directeur') {
+      throw new ForbiddenException('Access denied to recording segments');
+    }
+
+    const roomName = this.extractRoomFromKey(s3Key);
+    if (roomName) {
+      await this.ensureRoomAccess(roomName, currentUser.id, currentUser.role);
+    }
+
+    const segments = await this.prisma.recordingSegment.findMany({
+      where: { s3KeyOriginal: s3Key },
+      include: { porte: { select: { numero: true, etage: true, immeuble: { select: { adresse: true } } } } },
+      orderBy: { startTime: 'asc' },
+    });
+
+    const withUrls = await Promise.all(
+      segments.map(async (segment) => ({
+        ...segment,
+        streamingUrl: segment.s3KeySegment
+          ? await this.signedUrlOrUndefined(segment.s3KeySegment)
+          : undefined,
+      })),
+    );
+
+    return withUrls.map((segment) => ({
+      id: segment.id,
+      porteId: segment.porteId,
+      porteNumero: segment.porte.numero,
+      porteEtage: segment.porte.etage,
+      immeubleAdresse: segment.porte.immeuble.adresse,
+      s3KeySegment: segment.s3KeySegment ?? undefined,
+      statut: segment.statut ?? undefined,
+      startTime: segment.startTime,
+      endTime: segment.endTime,
+      durationSec: segment.durationSec,
+      transcription: segment.transcription ?? undefined,
+      speechScore: segment.speechScore ?? undefined,
+      status: segment.status,
+      streamingUrl: segment.streamingUrl,
+      createdAt: segment.createdAt,
+    }));
+  }
+
+  async getSegmentsByImmeuble(
+    immeubleId: number,
+    currentUser: { id: number; role: string },
+  ): Promise<RecordingSegmentDto[]> {
+    if (currentUser.role !== 'admin' && currentUser.role !== 'directeur') {
+      throw new ForbiddenException('Access denied to recording segments');
+    }
+
+    const segments = await this.prisma.recordingSegment.findMany({
+      where: { immeubleId },
+      include: { porte: { select: { numero: true, etage: true, immeuble: { select: { adresse: true } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const withUrls = await Promise.all(
+      segments.map(async (segment) => ({
+        ...segment,
+        streamingUrl: segment.s3KeySegment
+          ? await this.signedUrlOrUndefined(segment.s3KeySegment)
+          : undefined,
+      })),
+    );
+
+    return withUrls.map((segment) => ({
+      id: segment.id,
+      porteId: segment.porteId,
+      porteNumero: segment.porte.numero,
+      porteEtage: segment.porte.etage,
+      immeubleAdresse: segment.porte.immeuble.adresse,
       s3KeySegment: segment.s3KeySegment ?? undefined,
       statut: segment.statut ?? undefined,
       startTime: segment.startTime,

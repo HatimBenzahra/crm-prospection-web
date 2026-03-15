@@ -112,7 +112,27 @@ const GET_SPEECH_SCORES = `
   }
 `
 
-// Service pour la gestion des enregistrements
+const GET_RECORDING_SEGMENTS_BY_KEY = `
+  query RecordingSegmentsByKey($s3Key: String!) {
+    recordingSegmentsByKey(s3Key: $s3Key) {
+      id
+      porteId
+      porteNumero
+      porteEtage
+      immeubleAdresse
+      statut
+      startTime
+      endTime
+      durationSec
+      transcription
+      speechScore
+      status
+      streamingUrl
+      createdAt
+    }
+  }
+`
+
 export class RecordingService {
   /**
    * Récupère la liste des enregistrements pour un utilisateur (commercial ou manager)
@@ -353,6 +373,19 @@ export class RecordingService {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+  }
+
+  static async getSegmentsByKey(s3Key: string): Promise<any[]> {
+    try {
+      const response = await graphqlClient.request<{ recordingSegmentsByKey: any[] }>(
+        GET_RECORDING_SEGMENTS_BY_KEY,
+        { s3Key },
+      )
+      return response.recordingSegmentsByKey || []
+    } catch (error) {
+      Logger.error('Failed to load recording segments', error)
+      return []
+    }
   }
 }
 

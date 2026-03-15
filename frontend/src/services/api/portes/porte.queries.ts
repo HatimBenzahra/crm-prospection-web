@@ -181,6 +181,26 @@ export const GET_STATUS_HISTORIQUE_BY_IMMEUBLE = `
   }
 `
 
+export const GET_RECORDING_SEGMENTS_BY_IMMEUBLE = `
+  query RecordingSegmentsByImmeuble($immeubleId: Int!) {
+    recordingSegmentsByImmeuble(immeubleId: $immeubleId) {
+      id
+      porteId
+      porteNumero
+      porteEtage
+      statut
+      startTime
+      endTime
+      durationSec
+      transcription
+      speechScore
+      status
+      streamingUrl
+      createdAt
+    }
+  }
+`
+
 export const GET_RECORDING_SEGMENTS_BY_PORTE = `
   query RecordingSegmentsByPorte($porteId: Int!) {
     recordingSegmentsByPorte(porteId: $porteId) {

@@ -1,8 +1,10 @@
 import { useParams, Link } from 'react-router-dom'
 import { useImmeuble, useCommercials, useManagers, useInfinitePortesByImmeuble } from '@/services'
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Mic } from 'lucide-react'
 import { getStatusLabel, getStatusColor } from '@/constants/domain/porte-status'
+import { porteApi } from '@/services/api/portes/porte.service'
 
 export function useImmeubleDetailsLogic() {
   const { id } = useParams()
@@ -19,6 +21,32 @@ export function useImmeubleDetailsLogic() {
     10000,
     null
   )
+
+  const [segments, setSegments] = useState([])
+
+  useEffect(() => {
+    if (!id) return
+    let active = true
+    porteApi
+      .getRecordingSegmentsByImmeuble(parseInt(id))
+      .then(data => {
+        if (active) setSegments(data)
+      })
+      .catch(() => {
+        if (active) setSegments([])
+      })
+    return () => {
+      active = false
+    }
+  }, [id])
+
+  const porteSegmentCounts = useMemo(() => {
+    const counts = new Map()
+    for (const seg of segments) {
+      counts.set(seg.porteId, (counts.get(seg.porteId) || 0) + 1)
+    }
+    return counts
+  }, [segments])
 
   // Transformation des données API vers format UI
   const immeubleData = useMemo(() => {
@@ -224,6 +252,23 @@ export function useImmeubleDetailsLogic() {
         cell: row => row.lastVisit || <span className="text-muted-foreground">-</span>,
       },
       {
+        header: 'Audio',
+        accessor: 'audio',
+        cell: row => {
+          const count = porteSegmentCounts.get(row.porteId) || 0
+          if (count === 0) return <span className="text-muted-foreground">-</span>
+          return (
+            <Link
+              to={`/immeubles/${id}/portes/${row.porteId}`}
+              className="inline-flex items-center gap-1 text-primary hover:text-primary/80"
+            >
+              <Mic className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium">{count}</span>
+            </Link>
+          )
+        },
+      },
+      {
         header: 'Commentaire',
         accessor: 'comment',
         cell: row => {
@@ -238,11 +283,68 @@ export function useImmeubleDetailsLogic() {
         },
       },
     ],
-    [id]
+    [id, porteSegmentCounts]
   )
 
   const additionalSections = useMemo(
     () => [
+      ...(segments.length > 0
+        ? [
+            {
+              title: 'Enregistrements',
+              description: `${segments.length} segment${segments.length > 1 ? 's' : ''} audio pour cet immeuble`,
+              type: 'custom',
+              render: () => (
+                <div className="divide-y max-h-96 overflow-y-auto">
+                  {segments.map(seg => (
+                    <Link
+                      key={seg.id}
+                      to={`/immeubles/${id}/portes/${seg.porteId}`}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-primary/5 transition-colors group"
+                    >
+                      <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                        <Mic className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium">Porte {seg.porteNumero}</span>
+                          <span className="text-xs text-muted-foreground">
+                            Ét. {seg.porteEtage}
+                          </span>
+                          {seg.statut && (
+                            <Badge
+                              className={`text-[10px] px-1.5 py-0 h-4 ${getStatusColor(seg.statut)}`}
+                            >
+                              {getStatusLabel(seg.statut)}
+                            </Badge>
+                          )}
+                        </div>
+                        {seg.transcription && (
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">
+                            {seg.transcription}
+                          </p>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        {seg.speechScore != null && (
+                          <span
+                            className={`text-xs font-medium ${seg.speechScore >= 70 ? 'text-emerald-600' : seg.speechScore >= 40 ? 'text-amber-600' : 'text-red-600'}`}
+                          >
+                            {seg.speechScore}%
+                          </span>
+                        )}
+                        <div className="text-[10px] text-muted-foreground">
+                          {Math.floor(seg.durationSec / 60)}:
+                          {String(Math.floor(seg.durationSec % 60)).padStart(2, '0')}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ),
+            },
+          ]
+        : []),
       {
         title: 'Tableau des portes',
         description: 'Statut de prospection pour chaque porte',
@@ -264,7 +366,7 @@ export function useImmeubleDetailsLogic() {
         },
       },
     ],
-    [doorsData, columns]
+    [doorsData, columns, segments, id]
   )
 
   return {

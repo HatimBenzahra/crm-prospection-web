@@ -164,4 +164,22 @@ export class RecordingResolver {
   ): Promise<RecordingSegmentDto[]> {
     return this.svc.getSegmentsByPorte(porteId, user);
   }
+
+  @Query(() => [RecordingSegmentDto])
+  @Roles('admin', 'directeur')
+  async recordingSegmentsByKey(
+    @Args('s3Key') s3Key: string,
+    @CurrentUser() user: any,
+  ): Promise<RecordingSegmentDto[]> {
+    return this.svc.getSegmentsByKey(s3Key, user);
+  }
+
+  @Query(() => [RecordingSegmentDto])
+  @Roles('admin', 'directeur')
+  async recordingSegmentsByImmeuble(
+    @Args('immeubleId', { type: () => Int }) immeubleId: number,
+    @CurrentUser() user: any,
+  ): Promise<RecordingSegmentDto[]> {
+    return this.svc.getSegmentsByImmeuble(immeubleId, user);
+  }
 }

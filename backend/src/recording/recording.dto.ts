@@ -95,6 +95,9 @@ export class DoorSegmentInput {
 export class RecordingSegmentDto {
   @Field(() => Int) id: number;
   @Field(() => Int) porteId: number;
+  @Field({ nullable: true }) porteNumero?: string;
+  @Field(() => Int, { nullable: true }) porteEtage?: number;
+  @Field({ nullable: true }) immeubleAdresse?: string;
   @Field({ nullable: true }) s3KeySegment?: string;
   @Field({ nullable: true }) statut?: string;
   @Field(() => Float) startTime: number;

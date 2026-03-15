@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import AudioPlayer from '@/components/AudioPlayer'
 import { RecordingService } from '@/services/audio'
+import { getStatusLabel, getStatusColor } from '@/constants/domain/porte-status'
+import { SpeechScoreBar, formatDuration } from './EnregistrementComponents'
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,6 +15,8 @@ import {
   MessageSquare,
   FileAudio,
   Sparkles,
+  Building2,
+  Play,
 } from 'lucide-react'
 
 export default function RecordingDetailModal({
@@ -35,6 +39,9 @@ export default function RecordingDetailModal({
   const [extractionProgress, setExtractionProgress] = useState(null)
   const [extractionError, setExtractionError] = useState(false)
   const [extractionLoading, setExtractionLoading] = useState(false)
+  const [segments, setSegments] = useState([])
+  const [loadingSegments, setLoadingSegments] = useState(false)
+  const wavesurferRef = useRef(null)
 
   useEffect(() => {
     if (!recording?.key || !open) {
@@ -45,6 +52,7 @@ export default function RecordingDetailModal({
       setExtractionProgress(null)
       setExtractionError(false)
       setExtractionLoading(false)
+      setSegments([])
       return
     }
     let active = true
@@ -188,6 +196,32 @@ export default function RecordingDetailModal({
     }
   }, [extractionTriggered, recording?.key, open, conversationUrl])
 
+  useEffect(() => {
+    if (!recording?.key || !open) return
+    let active = true
+    setLoadingSegments(true)
+    RecordingService.getSegmentsByKey(recording.key)
+      .then(data => {
+        if (active) setSegments(data)
+      })
+      .finally(() => {
+        if (active) setLoadingSegments(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [recording?.key, open])
+
+  const handleSegmentSeek = useCallback(startTime => {
+    const ws = wavesurferRef.current
+    if (!ws) return
+    const dur = ws.getDuration()
+    if (dur > 0) {
+      ws.seekTo(startTime / dur)
+      ws.play()
+    }
+  }, [])
+
   const activeUrl = showConversationOnly && conversationUrl ? conversationUrl : streamingUrl
 
   if (!recording) return null
@@ -291,7 +325,8 @@ export default function RecordingDetailModal({
               ) : extractionError ? (
                 <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-destructive/5 border border-destructive/10 animate-in fade-in duration-300">
                   <span className="text-xs text-muted-foreground">
-                    L'extraction a échoué. Le service de transcription est peut-être temporairement indisponible.
+                    L'extraction a échoué. Le service de transcription est peut-être temporairement
+                    indisponible.
                   </span>
                   <button
                     type="button"
@@ -320,6 +355,9 @@ export default function RecordingDetailModal({
                 src={activeUrl}
                 title={recording.filename}
                 onDownload={() => onDownload?.(recording)}
+                onWavesurferReady={ws => {
+                  wavesurferRef.current = ws
+                }}
               />
             </>
           )}
@@ -328,6 +366,67 @@ export default function RecordingDetailModal({
               <p className="text-sm text-muted-foreground text-center">
                 L'URL de streaming n'est pas disponible pour cet enregistrement.
               </p>
+            </div>
+          )}
+
+          {!loadingSegments && segments.length > 0 && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/30 border-b">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Segments par porte</span>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 ml-auto">
+                  {segments.length}
+                </Badge>
+              </div>
+              <div className="divide-y max-h-56 overflow-y-auto">
+                {segments.map(seg => (
+                  <button
+                    type="button"
+                    key={seg.id}
+                    onClick={() => handleSegmentSeek(seg.startTime)}
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-primary/5 cursor-pointer transition-colors group w-full text-left"
+                  >
+                    <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      <Play className="w-3 h-3" />
+                    </div>
+                    <div className="flex-shrink-0 w-20">
+                      <span className="text-xs font-mono tabular-nums text-muted-foreground">
+                        {formatDuration(seg.startTime)} → {formatDuration(seg.endTime)}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm font-medium">Porte {seg.porteNumero}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Ét. {seg.porteEtage}
+                        </span>
+                        {seg.statut && (
+                          <Badge
+                            className={`text-[10px] px-1.5 py-0 h-4 ${getStatusColor(seg.statut)}`}
+                          >
+                            {getStatusLabel(seg.statut)}
+                          </Badge>
+                        )}
+                      </div>
+                      {seg.transcription && (
+                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                          {seg.transcription}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0">
+                      {seg.speechScore != null && <SpeechScoreBar score={seg.speechScore} />}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {loadingSegments && (
+            <div className="flex items-center gap-2 justify-center py-3 text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-xs">Chargement des segments...</span>
             </div>
           )}
 

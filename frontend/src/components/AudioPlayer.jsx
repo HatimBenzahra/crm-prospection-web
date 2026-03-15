@@ -42,12 +42,18 @@ function biquadCoeffs(type, f0, Q, fs) {
 
 function biquadProcess(x, c) {
   const y = new Float32Array(x.length)
-  let x1 = 0, x2 = 0, y1 = 0, y2 = 0
+  let x1 = 0,
+    x2 = 0,
+    y1 = 0,
+    y2 = 0
   for (let i = 0; i < x.length; i++) {
     const x0 = x[i]
     const y0 = c.b0 * x0 + c.b1 * x1 + c.b2 * x2 - c.a1 * y1 - c.a2 * y2
     y[i] = y0
-    x2 = x1; x1 = x0; y2 = y1; y1 = y0
+    x2 = x1
+    x1 = x0
+    y2 = y1
+    y1 = y0
   }
   return y
 }
@@ -98,7 +104,7 @@ function detectSpeechRegions(audioBuffer) {
     for (let j = 0; j < frameLen; j++) {
       const v = filtered[i + j]
       sumsq += v * v
-      if ((v >= 0) !== (prev >= 0)) signChanges++
+      if (v >= 0 !== prev >= 0) signChanges++
       prev = v
     }
     Edb.push(10 * Math.log10(sumsq / frameLen + eps))
@@ -108,7 +114,8 @@ function detectSpeechRegions(audioBuffer) {
     for (let j = 0; j < fftSize; j++) fftIn[j] = j < frameLen ? pcm[i + j] : 0
     fft.realTransform(fftOut, fftIn)
 
-    let logSum = 0, linSum = 0
+    let logSum = 0,
+      linSum = 0
     for (let k = 1; k < halfN; k++) {
       const re = fftOut[2 * k]
       const im = fftOut[2 * k + 1]
@@ -125,13 +132,13 @@ function detectSpeechRegions(audioBuffer) {
 
   // 3. Adaptive threshold: p10 noise floor + SNR offset
   const sortedE = [...Edb].sort((a, b) => a - b)
-  const p10 = percentile(sortedE, 0.10)
+  const p10 = percentile(sortedE, 0.1)
   const snrDb = 15
   const thr = Math.max(p10 + snrDb, -45)
 
   // 4. Frame classification: majority vote (3 features, need 2+)
   const zcrMin = 0.02
-  const zcrMax = 0.20
+  const zcrMax = 0.2
   const flatnessMax = 0.4
 
   const raw = Edb.map((e, k) => {
@@ -146,7 +153,9 @@ function detectSpeechRegions(audioBuffer) {
   const startNeed = 3
   const hangFrames = 5
   const speech = new Array(raw.length).fill(false)
-  let state = false, run = 0, hangLeft = 0
+  let state = false,
+    run = 0,
+    hangLeft = 0
 
   for (let i = 0; i < raw.length; i++) {
     if (!state) {
@@ -160,16 +169,22 @@ function detectSpeechRegions(audioBuffer) {
     } else {
       if (raw[i]) hangLeft = hangFrames
       else hangLeft--
-      if (hangLeft < 0) { state = false; run = 0 }
-      else speech[i] = true
+      if (hangLeft < 0) {
+        state = false
+        run = 0
+      } else speech[i] = true
     }
   }
 
   // 6. Convert frames → time segments
   const segments = []
-  let inSeg = false, segStart = 0
+  let inSeg = false,
+    segStart = 0
   for (let i = 0; i < speech.length; i++) {
-    if (speech[i] && !inSeg) { inSeg = true; segStart = i }
+    if (speech[i] && !inSeg) {
+      inSeg = true
+      segStart = i
+    }
     if (!speech[i] && inSeg) {
       inSeg = false
       segments.push({
@@ -206,7 +221,7 @@ function detectSpeechRegions(audioBuffer) {
   return cleaned
 }
 
-function AudioPlayer({ src, title, onDownload }) {
+function AudioPlayer({ src, title, onDownload, onWavesurferReady }) {
   const waveformRef = useRef(null)
   const wsRef = useRef(null)
   const containerRef = useRef(null)
@@ -261,11 +276,12 @@ function AudioPlayer({ src, title, onDownload }) {
       url: src,
     })
 
-    ws.on('ready', (dur) => {
+    ws.on('ready', dur => {
       setDuration(dur)
       setIsReady(true)
       setIsLoading(false)
       ws.setVolume(1)
+      onWavesurferReady?.(ws)
 
       const decoded = ws.getDecodedData()
       if (decoded && dur > 0) {
@@ -279,7 +295,7 @@ function AudioPlayer({ src, title, onDownload }) {
       }
     })
 
-    ws.on('timeupdate', (time) => {
+    ws.on('timeupdate', time => {
       setCurrentTime(time)
     })
 
@@ -287,7 +303,7 @@ function AudioPlayer({ src, title, onDownload }) {
     ws.on('pause', () => setIsPlaying(false))
     ws.on('finish', () => setIsPlaying(false))
 
-    ws.on('loading', (percent) => {
+    ws.on('loading', percent => {
       if (percent < 100) setIsLoading(true)
     })
 
@@ -309,10 +325,13 @@ function AudioPlayer({ src, title, onDownload }) {
     wsRef.current.playPause()
   }, [isReady])
 
-  const skip = useCallback((seconds) => {
-    if (!wsRef.current || !isReady) return
-    wsRef.current.skip(seconds)
-  }, [isReady])
+  const skip = useCallback(
+    seconds => {
+      if (!wsRef.current || !isReady) return
+      wsRef.current.skip(seconds)
+    },
+    [isReady]
+  )
 
   const cycleSpeed = useCallback(() => {
     if (!wsRef.current) return
@@ -329,7 +348,7 @@ function AudioPlayer({ src, title, onDownload }) {
   }, [playbackSpeed])
 
   useEffect(() => {
-    const onKeyDown = (e) => {
+    const onKeyDown = e => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
       if (e.code === 'Space') {
         e.preventDefault()
@@ -340,7 +359,7 @@ function AudioPlayer({ src, title, onDownload }) {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [togglePlay])
 
-  const handleVolumeChange = useCallback((e) => {
+  const handleVolumeChange = useCallback(e => {
     const val = e.target.value / 100
     setVolume(val)
     if (wsRef.current) wsRef.current.setVolume(val)
@@ -354,7 +373,7 @@ function AudioPlayer({ src, title, onDownload }) {
     wsRef.current.setMuted(next)
   }, [isMuted])
 
-  const formatTime = useCallback((time) => {
+  const formatTime = useCallback(time => {
     if (!time || isNaN(time)) return '0:00'
     const m = Math.floor(time / 60)
     const s = Math.floor(time % 60)
@@ -422,17 +441,8 @@ function AudioPlayer({ src, title, onDownload }) {
             <SkipBack className="w-4 h-4" />
           </Button>
 
-          <Button
-            size="sm"
-            onClick={togglePlay}
-            disabled={!isReady}
-            className="h-9 w-9 p-0"
-          >
-            {isPlaying ? (
-              <Pause className="w-4 h-4" />
-            ) : (
-              <Play className="w-4 h-4" />
-            )}
+          <Button size="sm" onClick={togglePlay} disabled={!isReady} className="h-9 w-9 p-0">
+            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
           </Button>
 
           <Button
