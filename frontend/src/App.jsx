@@ -35,6 +35,12 @@ const Enregistrement = lazy(() => import('@/pages-ADMIN-DIRECTEUR/ecoutes/Enregi
 const Statistiques = lazy(() => import('@/pages-ADMIN-DIRECTEUR/statistiques/Statistiques'))
 const Gestion = lazy(() => import('@/pages-ADMIN-DIRECTEUR/gestion/Gestion'))
 const Gamification = lazy(() => import('@/pages-ADMIN-DIRECTEUR/gamification/Gamification'))
+const KioskOverview = lazy(() => import('@/pages-ADMIN-DIRECTEUR/kiosk/KioskOverview'))
+const KioskDevicesPage = lazy(() => import('@/pages-ADMIN-DIRECTEUR/kiosk/KioskDevicesPage'))
+const KioskReleasesPage = lazy(() => import('@/pages-ADMIN-DIRECTEUR/kiosk/KioskReleasesPage'))
+const KioskDeploymentsPage = lazy(() => import('@/pages-ADMIN-DIRECTEUR/kiosk/KioskDeploymentsPage'))
+const KioskLogsPage = lazy(() => import('@/pages-ADMIN-DIRECTEUR/kiosk/KioskLogsPage'))
+const KioskLocationPage = lazy(() => import('@/pages-ADMIN-DIRECTEUR/kiosk/KioskLocationPage'))
 
 // Lazy load commercial pages
 const CommercialLayoutComponent = lazy(
@@ -77,6 +83,12 @@ function AdminLayout() {
     ecoutes: { label: 'Écoutes', href: '/ecoutes/live' },
     statistiques: { label: 'Statistiques', href: '/statistiques' },
     gamification: { label: 'Gamification', href: '/gamification' },
+    kiosk: { label: 'Kiosk', href: '/kiosk' },
+    tablettes: { label: 'Tablettes', href: '/kiosk/tablettes' },
+    releases: { label: 'Releases', href: '/kiosk/releases' },
+    deploiements: { label: 'Déploiements', href: '/kiosk/deploiements' },
+    logs: { label: 'Logs', href: '/kiosk/logs' },
+    localisation: { label: 'Localisation', href: '/kiosk/localisation' },
     assignations: { label: 'Assignations en cours', href: '/zones/assignations' },
     historique: { label: 'Historique', href: '/zones/historique' },
   }
@@ -318,6 +330,54 @@ function AdminLayout() {
                     element={
                       <SectionErrorBoundary>
                         <Gamification />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/kiosk"
+                    element={
+                      <SectionErrorBoundary>
+                        <KioskOverview />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/kiosk/tablettes"
+                    element={
+                      <SectionErrorBoundary>
+                        <KioskDevicesPage />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/kiosk/releases"
+                    element={
+                      <SectionErrorBoundary>
+                        <KioskReleasesPage />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/kiosk/deploiements"
+                    element={
+                      <SectionErrorBoundary>
+                        <KioskDeploymentsPage />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/kiosk/logs"
+                    element={
+                      <SectionErrorBoundary>
+                        <KioskLogsPage />
+                      </SectionErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/kiosk/localisation"
+                    element={
+                      <SectionErrorBoundary>
+                        <KioskLocationPage />
                       </SectionErrorBoundary>
                     }
                   />

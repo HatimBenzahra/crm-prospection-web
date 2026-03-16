@@ -3,7 +3,9 @@
 interface ImportMetaEnv {
   readonly VITE_API_URL: string
   readonly VITE_MAPBOX_ACCESS_TOKEN: string
-  // Ajoutez d'autres variables d'environnement ici
+  readonly VITE_KIOSK_API_URL: string
+  readonly VITE_KIOSK_API_USER: string
+  readonly VITE_KIOSK_API_PASS: string
 }
 
 interface ImportMeta {

@@ -6,6 +6,7 @@ import { immeubleApi } from './immeubles'
 import { porteApi } from './portes'
 import { gamificationApi } from './gamification'
 import { statisticApi, authApi } from './statistics'
+import { kioskApi } from './kiosk'
 
 export * from './commercials'
 export * from './managers'
@@ -15,6 +16,7 @@ export * from './immeubles'
 export * from './portes'
 export * from './statistics'
 export * from './gamification'
+export * from './kiosk'
 
 export const api = {
   auth: authApi,
@@ -26,6 +28,7 @@ export const api = {
   statistics: statisticApi,
   portes: porteApi,
   gamification: gamificationApi,
+  kiosk: kioskApi,
 }
 
 export default api

@@ -15,6 +15,12 @@ import {
   UserCog,
   Briefcase,
   Settings,
+  Smartphone,
+  LayoutDashboard,
+  Tablet,
+  Package,
+  Rocket,
+  ScrollText,
 } from 'lucide-react'
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
@@ -40,9 +46,7 @@ import {
   SidebarMenuSubButton,
 } from '@/components/ui/sidebar'
 
-const mainItems = [
-  { title: 'Dashboard', url: '/', icon: Home, entity: 'dashboard' },
-]
+const mainItems = [{ title: 'Dashboard', url: '/', icon: Home, entity: 'dashboard' }]
 
 const teamItems = [
   { title: 'Directeurs', url: '/directeurs', icon: Shield, entity: 'directeurs' },
@@ -54,26 +58,50 @@ const teamItems = [
 const prospectionItems = [
   { title: 'Immeubles', url: '/immeubles', icon: Building2, entity: 'immeubles' },
   {
-    title: 'Zones', url: '/zones', icon: MapPin, entity: 'zones',
+    title: 'Zones',
+    url: '/zones',
+    icon: MapPin,
+    entity: 'zones',
     subitems: [
       { title: "Vue d'ensemble", url: '/zones' },
       { title: 'Assignations', url: '/zones/assignations' },
       { title: 'Historique', url: '/zones/historique' },
     ],
   },
-  { title: 'Suivi GPS', url: '/gps-tracking', icon: Navigation2, entity: 'gps-tracking', disabled: true },
+  {
+    title: 'Suivi GPS',
+    url: '/gps-tracking',
+    icon: Navigation2,
+    entity: 'gps-tracking',
+    disabled: true,
+  },
+]
+
+const kioskItems = [
+  { title: "Vue d'ensemble", url: '/kiosk', icon: LayoutDashboard, entity: 'kiosk' },
+  { title: 'Tablettes', url: '/kiosk/tablettes', icon: Tablet, entity: 'kiosk' },
+  { title: 'Releases', url: '/kiosk/releases', icon: Package, entity: 'kiosk' },
+  { title: 'Déploiements', url: '/kiosk/deploiements', icon: Rocket, entity: 'kiosk' },
+  { title: 'Logs', url: '/kiosk/logs', icon: ScrollText, entity: 'kiosk' },
+  { title: 'Localisation', url: '/kiosk/localisation', icon: MapPin, entity: 'kiosk' },
 ]
 
 const toolsItems = [
   {
-    title: 'Écoutes', url: '/ecoutes', icon: Headphones, entity: 'ecoutes',
+    title: 'Écoutes',
+    url: '/ecoutes',
+    icon: Headphones,
+    entity: 'ecoutes',
     subitems: [
       { title: 'Écoute Live', url: '/ecoutes/live' },
       { title: 'Enregistrements', url: '/ecoutes/enregistrement' },
     ],
   },
   {
-    title: 'Gamification', url: '/gamification', icon: Trophy, entity: 'gamification',
+    title: 'Gamification',
+    url: '/gamification',
+    icon: Trophy,
+    entity: 'gamification',
     subitems: [
       { title: 'Classement', url: '/gamification' },
       { title: 'Badges', url: '/gamification/badges' },
@@ -85,7 +113,7 @@ const toolsItems = [
   { title: 'Statistiques', url: '/statistiques', icon: BarChart3, entity: 'statistics' },
 ]
 
-const items = [...mainItems, ...teamItems, ...prospectionItems, ...toolsItems]
+const items = [...mainItems, ...teamItems, ...kioskItems, ...prospectionItems, ...toolsItems]
 
 export function AppSidebar() {
   const { currentRole, logout } = useRole()
@@ -245,16 +273,7 @@ export function AppSidebar() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [sections])
 
-  // Filtrer les éléments enrichis selon les permissions
-  const visibleItems = enrichedItems.filter(item => {
-    // Si pas d'entité spécifiée, toujours visible (Dashboard, Paramètres)
-    if (!item.entity) return true
-
-    // Vérifier si l'utilisateur a la permission de voir cette entité
-    return hasPermission(currentRole, item.entity, 'view')
-  })
-
-  const renderMenuItem = (item) => {
+  const renderMenuItem = item => {
     if (item.subitems) {
       const isAnySubitemActive = item.subitems.some(sub => isActiveRoute(sub.url))
       return (
@@ -284,14 +303,21 @@ export function AppSidebar() {
                         <span>{subitem.title}</span>
                       </SidebarMenuSubButton>
                     ) : subitem.isBackLink ? (
-                      <SidebarMenuSubButton asChild isActive={false} className="font-semibold text-primary">
+                      <SidebarMenuSubButton
+                        asChild
+                        isActive={false}
+                        className="font-semibold text-primary"
+                      >
                         <Link to={subitem.url}>
                           <ArrowLeft className="h-3 w-3 mr-1" />
                           <span>{subitem.title}</span>
                         </Link>
                       </SidebarMenuSubButton>
                     ) : (
-                      <SidebarMenuSubButton asChild isActive={isActiveRoute(subitem.url, item.subitems)}>
+                      <SidebarMenuSubButton
+                        asChild
+                        isActive={isActiveRoute(subitem.url, item.subitems)}
+                      >
                         <Link to={subitem.url}>
                           <span>{subitem.title}</span>
                         </Link>
@@ -341,7 +367,9 @@ export function AppSidebar() {
                 <img src={logoSvg} alt="Pro-Win" className="size-10 rounded-xl shadow-md" />
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="truncate text-base font-bold tracking-tight">Pro-Win</span>
-                  <span className="truncate text-[11px] text-sidebar-foreground/50 font-medium">Prospection</span>
+                  <span className="truncate text-[11px] text-sidebar-foreground/50 font-medium">
+                    Prospection
+                  </span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -352,14 +380,22 @@ export function AppSidebar() {
         {[
           { label: 'Principal', items: mainItems },
           { label: 'Équipe', items: teamItems },
+          { label: 'Kiosk', items: kioskItems },
           { label: 'Prospection', items: prospectionItems },
           { label: 'Outils', items: toolsItems },
         ].map((group, idx) => {
-          const groupVisible = group.items.filter(item => !item.entity || hasPermission(currentRole, item.entity, 'view'))
+          const groupVisible = group.items.filter(
+            item => !item.entity || hasPermission(currentRole, item.entity, 'view')
+          )
           if (groupVisible.length === 0) return null
           return (
-            <SidebarGroup key={group.label} className={idx > 0 ? 'border-t border-sidebar-border/50 pt-2' : ''}>
-              <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40 font-semibold">{group.label}</SidebarGroupLabel>
+            <SidebarGroup
+              key={group.label}
+              className={idx > 0 ? 'border-t border-sidebar-border/50 pt-2' : ''}
+            >
+              <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40 font-semibold">
+                {group.label}
+              </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {groupVisible.map(item => {
@@ -391,7 +427,10 @@ export function AppSidebar() {
               </div>
               <LogOut
                 className="h-4 w-4 text-sidebar-foreground/40 hover:text-destructive cursor-pointer transition-colors ml-auto"
-                onClick={(e) => { e.stopPropagation(); logout(); }}
+                onClick={e => {
+                  e.stopPropagation()
+                  logout()
+                }}
               />
             </SidebarMenuButton>
           </SidebarMenuItem>
