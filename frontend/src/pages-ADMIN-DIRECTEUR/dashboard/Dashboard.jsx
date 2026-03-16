@@ -194,7 +194,7 @@ function Top3PerfCard({ mode, setMode, top3, loading }) {
               return (
                 <div
                   key={entry.id}
-                  className={`relative flex flex-col items-center rounded-xl border ${style.border} p-4 hover:shadow-md transition-all duration-200 ${i === 0 ? 'sm:-mt-1 sm:pb-5 bg-gradient-to-b from-yellow-50/50 to-transparent dark:from-yellow-950/10' : 'bg-muted/20'}`}
+                  className={`relative flex flex-col items-center rounded-xl border ${style.border} p-4 hover:shadow-md transition-all duration-200 ${i === 0 ? 'sm:-mt-1 sm:pb-5 bg-linear-to-b from-yellow-50/50 to-transparent dark:from-yellow-950/10' : 'bg-muted/20'}`}
                 >
                   <div
                     className={`absolute -top-2.5 right-2.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${style.badge}`}

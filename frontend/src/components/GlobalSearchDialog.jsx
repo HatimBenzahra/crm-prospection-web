@@ -355,7 +355,7 @@ export default function GlobalSearchDialog() {
                       key={`${item.type}-${item.id}`}
                       onClick={() => handleSelect(item)}
                       onMouseEnter={() => setSelectedIndex(idx)}
-                      className={`flex items-center gap-3 w-full px-5 py-3 text-left transition-all duration-100 ${isSelected ? 'bg-primary/[0.05]' : ''}`}
+                      className={`flex items-center gap-3 w-full px-5 py-3 text-left transition-all duration-100 ${isSelected ? 'bg-primary/5' : ''}`}
                     >
                       <div
                         className={`flex items-center justify-center w-9 h-9 rounded-xl shrink-0 ${config.color} transition-transform duration-100 ${isSelected ? 'scale-110' : ''}`}
