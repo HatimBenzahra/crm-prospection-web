@@ -33,6 +33,36 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useDashboardLogic } from './useDashboardLogic'
 import PorteDetailModal from './PorteDetailModal'
 
+function AnimatedNumber({ value, duration = 800 }) {
+  const [display, setDisplay] = React.useState(0)
+  const isPercentage = typeof value === 'string' && String(value).endsWith('%')
+  const numericValue = isPercentage ? parseInt(value) : Number(value) || 0
+
+  React.useEffect(() => {
+    if (numericValue === 0) {
+      setDisplay(0)
+      return
+    }
+    const start = performance.now()
+    let raf
+    const step = now => {
+      const progress = Math.min((now - start) / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setDisplay(Math.round(numericValue * eased))
+      if (progress < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [numericValue, duration])
+
+  return (
+    <>
+      {display}
+      {isPercentage ? '%' : ''}
+    </>
+  )
+}
+
 function buildMonthOptions() {
   const options = []
   const now = new Date()
@@ -164,7 +194,7 @@ function Top3PerfCard({ mode, setMode, top3, loading }) {
               return (
                 <div
                   key={entry.id}
-                  className={`relative flex flex-col items-center rounded-xl border ${style.border} p-4 ${i === 0 ? 'sm:-mt-1 sm:pb-5 bg-gradient-to-b from-yellow-50/50 to-transparent dark:from-yellow-950/10' : 'bg-muted/20'}`}
+                  className={`relative flex flex-col items-center rounded-xl border ${style.border} p-4 hover:shadow-md transition-all duration-200 ${i === 0 ? 'sm:-mt-1 sm:pb-5 bg-gradient-to-b from-yellow-50/50 to-transparent dark:from-yellow-950/10' : 'bg-muted/20'}`}
                 >
                   <div
                     className={`absolute -top-2.5 right-2.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${style.badge}`}
@@ -345,20 +375,48 @@ const SEGMENT_FILTERS = [
   { key: 'TOUS', label: 'Tous' },
 ]
 
+const KPI_COLORS = {
+  emerald: {
+    iconBg: 'bg-emerald-100 dark:bg-emerald-900/30',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    accent: 'border-l-4 border-l-emerald-500',
+  },
+  blue: {
+    iconBg: 'bg-blue-100 dark:bg-blue-900/30',
+    iconColor: 'text-blue-600 dark:text-blue-400',
+    accent: 'border-l-4 border-l-blue-500',
+  },
+  amber: {
+    iconBg: 'bg-amber-100 dark:bg-amber-900/30',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    accent: 'border-l-4 border-l-amber-500',
+  },
+  violet: {
+    iconBg: 'bg-violet-100 dark:bg-violet-900/30',
+    iconColor: 'text-violet-600 dark:text-violet-400',
+    accent: 'border-l-4 border-l-violet-500',
+  },
+}
+
 // eslint-disable-next-line no-unused-vars -- Icon is used as JSX component
-function KpiCard({ title, value, description, icon: Icon, trend }) {
+function KpiCard({ title, value, description, icon: Icon, trend, color = 'blue' }) {
   const isPositive = trend && trend > 0
+  const colors = KPI_COLORS[color] || KPI_COLORS.blue
   return (
-    <Card className="relative overflow-hidden">
+    <Card
+      className={`relative overflow-hidden hover:scale-[1.02] transition-all duration-200 cursor-default ${colors.accent}`}
+    >
       <CardContent className="pt-6">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground">{title}</p>
-            <p className="text-3xl font-bold tracking-tight">{value}</p>
+            <p className="text-3xl font-bold tracking-tight">
+              <AnimatedNumber value={value} />
+            </p>
             {description && <p className="text-xs text-muted-foreground">{description}</p>}
           </div>
-          <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-primary/10">
-            <Icon className="h-5 w-5 text-primary" />
+          <div className={`flex items-center justify-center w-11 h-11 rounded-xl ${colors.iconBg}`}>
+            <Icon className={`h-5 w-5 ${colors.iconColor}`} />
           </div>
         </div>
         {trend !== undefined && trend !== null && (
@@ -385,7 +443,10 @@ function SegmentRow({ segment, onClick, onImmeubleClick }) {
       })
     : '—'
   return (
-    <tr onClick={onClick} className="hover:bg-muted/30 cursor-pointer transition-colors group">
+    <tr
+      onClick={onClick}
+      className="hover:bg-muted/30 cursor-pointer transition-colors group even:bg-muted/10"
+    >
       <td className="px-4 py-3">
         <div className="text-[13px] font-medium">Porte {segment.porteNumero}</div>
         <button
@@ -487,22 +548,61 @@ export default function Dashboard() {
   if (isLoading)
     return (
       <div className="flex flex-col gap-6">
-        <Skeleton className="h-10 w-64" />
+        <div className="flex items-end justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-8 w-48" />
+          </div>
+          <Skeleton className="h-5 w-36" />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => (
-            <Skeleton key={i} className="h-32" />
+            <div key={i} className="rounded-xl border border-border/60 p-6 space-y-3">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-8 w-16" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+                <Skeleton className="h-11 w-11 rounded-xl" />
+              </div>
+            </div>
           ))}
         </div>
-        <Skeleton className="h-64" />
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-3 rounded-xl border border-border/60 p-6 space-y-4">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+          <div className="lg:col-span-2 rounded-xl border border-border/60 p-6 space-y-3">
+            <Skeleton className="h-6 w-36" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        </div>
       </div>
     )
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+    <div className="flex flex-col gap-6">
+      <style>{`
+        @keyframes dashFadeIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .dash-stagger { animation: dashFadeIn 0.5s ease-out forwards; opacity: 0; }
+      `}</style>
+      <div
+        className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 dash-stagger"
+        style={{ animationDelay: '0ms' }}
+      >
         <div>
+          <p className="text-sm font-medium text-muted-foreground">
+            {new Date().getHours() < 18 ? 'Bonjour' : 'Bonsoir'} 👋
+          </p>
           <h1 className="text-2xl font-bold tracking-tight">Tableau de bord</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Aperçu des performances du jour</p>
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
           <Calendar className="h-4 w-4" />
@@ -512,34 +612,44 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 dash-stagger"
+        style={{ animationDelay: '80ms' }}
+      >
         <KpiCard
           title="Contrats signés"
           value={totals.contrats}
           description="Signatures du jour"
           icon={Trophy}
+          color="emerald"
         />
         <KpiCard
           title="Portes prospectées"
           value={totals.portes}
           description="Visites effectuées"
           icon={DoorOpen}
+          color="blue"
         />
         <KpiCard
           title="Rendez-vous pris"
           value={totals.rdv}
           description="Planifiés aujourd'hui"
           icon={Calendar}
+          color="amber"
         />
         <KpiCard
           title="Taux de conversion"
           value={tauxConversion}
           description={`${totals.immeubles} immeuble${totals.immeubles > 1 ? 's' : ''} prospecté${totals.immeubles > 1 ? 's' : ''}`}
           icon={TrendingUp}
+          color="violet"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div
+        className="grid grid-cols-1 lg:grid-cols-5 gap-6 dash-stagger"
+        style={{ animationDelay: '160ms' }}
+      >
         <Card className="lg:col-span-3">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -557,7 +667,7 @@ export default function Dashboard() {
                   type="button"
                   key={filter.key ?? 'all'}
                   onClick={() => setSegmentFilter(filter.key)}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all shrink-0 ${
+                  className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all shrink-0 active:scale-95 ${
                     segmentFilter === filter.key
                       ? 'bg-primary/10 text-primary border-primary/20'
                       : 'text-muted-foreground/60 border-transparent hover:bg-muted/40 hover:text-muted-foreground'
@@ -586,7 +696,7 @@ export default function Dashboard() {
             {!segmentsLoading && segments.length > 0 && (
               <div className="max-h-[420px] overflow-y-auto overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-muted/30 sticky top-0">
+                  <thead className="bg-muted/50 backdrop-blur-sm sticky top-0">
                     <tr className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                       <th className="px-4 py-2 text-left">Porte</th>
                       <th className="px-4 py-2 text-left">Commercial</th>
@@ -638,7 +748,7 @@ export default function Dashboard() {
                         type="button"
                         key={porte.id}
                         onClick={() => setSelectedPorteId(porte.id)}
-                        className="group flex items-start gap-3 w-full px-4 py-3.5 text-left hover:bg-muted/30 transition-colors"
+                        className="group flex items-start gap-3 w-full px-4 py-3.5 text-left hover:bg-muted/30 transition-colors active:scale-[0.99]"
                       >
                         <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary/10 text-primary shrink-0 mt-0.5">
                           <DoorOpen className="h-4 w-4" />
@@ -648,7 +758,9 @@ export default function Dashboard() {
                             <span className="text-[13px] font-semibold leading-none truncate">
                               {immeuble?.adresse || '—'} — Porte {porte.numero}
                               {porte.etage != null && (
-                                <span className="ml-1 text-[11px] font-normal text-muted-foreground">· Ét. {porte.etage}</span>
+                                <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                                  · Ét. {porte.etage}
+                                </span>
                               )}
                             </span>
                             <span className="text-[13px] font-bold tabular-nums text-primary shrink-0">
@@ -662,7 +774,9 @@ export default function Dashboard() {
                           )}
                           <div className="flex items-center justify-between gap-2 pt-0.5">
                             <div className="flex items-center gap-1.5 min-w-0">
-                              <Badge className={`text-[10px] px-1.5 py-0 leading-5 font-medium border-0 ${getStatusColor(porte.statut)}`}>
+                              <Badge
+                                className={`text-[10px] px-1.5 py-0 leading-5 font-medium border-0 ${getStatusColor(porte.statut)}`}
+                              >
                                 {getStatusLabel(porte.statut)}
                               </Badge>
                               {immeuble?.commercial && (
@@ -711,9 +825,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <Top3PerfCard mode={perfMode} setMode={setPerfMode} top3={top3} loading={rankingLoading} />
+      <div className="dash-stagger" style={{ animationDelay: '240ms' }}>
+        <Top3PerfCard mode={perfMode} setMode={setPerfMode} top3={top3} loading={rankingLoading} />
+      </div>
 
-      <ActiveZonesSlider_Dashboard assignments={assignments || []} />
+      <div className="dash-stagger" style={{ animationDelay: '320ms' }}>
+        <ActiveZonesSlider_Dashboard assignments={assignments || []} />
+      </div>
 
       <PorteDetailModal
         open={selectedPorteId !== null}
@@ -723,8 +841,8 @@ export default function Dashboard() {
         porteId={selectedPorteId}
         immeuble={
           selectedPorteId
-            ? immeubles?.find(imm =>
-                rdvToday?.find(p => p.id === selectedPorteId)?.immeubleId === imm.id
+            ? immeubles?.find(
+                imm => rdvToday?.find(p => p.id === selectedPorteId)?.immeubleId === imm.id
               )
             : null
         }
