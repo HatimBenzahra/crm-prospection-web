@@ -9,7 +9,7 @@ export default function KioskOverview() {
   const devicesQuery = useKioskDevices()
   const logsQuery = useKioskLogs()
 
-  const devices = devicesQuery.data || []
+  const devices = useMemo(() => devicesQuery.data || [], [devicesQuery.data])
   const onlineDevices = useMemo(() => devices.filter(device => device.online).length, [devices])
   const offlineDevices = useMemo(() => devices.filter(device => !device.online).length, [devices])
   const lowBatteryDevices = useMemo(
@@ -43,7 +43,11 @@ export default function KioskOverview() {
         </div>
         <KioskErrorState
           error={mainError}
-          onRetry={() => { healthQuery.refetch(); devicesQuery.refetch(); logsQuery.refetch() }}
+          onRetry={() => {
+            healthQuery.refetch()
+            devicesQuery.refetch()
+            logsQuery.refetch()
+          }}
         />
       </div>
     )
