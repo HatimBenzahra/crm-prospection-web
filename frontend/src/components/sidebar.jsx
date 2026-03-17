@@ -78,7 +78,7 @@ const prospectionItems = [
 ]
 
 const kioskItems = [
-  { title: "Vue d'ensemble", url: '/kiosk', icon: LayoutDashboard, entity: 'kiosk' },
+  { title: "Vue d'ensemble", url: '/kiosk', icon: LayoutDashboard, entity: 'kiosk', exact: true },
   { title: 'Tablettes', url: '/kiosk/tablettes', icon: Tablet, entity: 'kiosk' },
   { title: 'Releases', url: '/kiosk/releases', icon: Package, entity: 'kiosk' },
   { title: 'Déploiements', url: '/kiosk/deploiements', icon: Rocket, entity: 'kiosk' },
@@ -127,13 +127,17 @@ export function AppSidebar() {
     return value.replace(/\/+$/, '') || '/'
   }
 
-  const isActiveRoute = (path, subitems = []) => {
+  const isActiveRoute = (path, subitems = [], exact = false) => {
     const currentPath = normalizePath(location.pathname)
     const targetPath = normalizePath(path)
 
     if (!targetPath) return false
     if (targetPath === '/') {
       return currentPath === '/'
+    }
+
+    if (exact) {
+      return currentPath === targetPath
     }
 
     // Si cet item a des sous-items, vérifier s'il y a une correspondance plus spécifique
@@ -336,7 +340,7 @@ export function AppSidebar() {
       <SidebarMenuItem key={item.title}>
         <SidebarMenuButton
           asChild={!item.disabled}
-          isActive={isActiveRoute(item.url)}
+          isActive={isActiveRoute(item.url, item.subitems, item.exact)}
           disabled={item.disabled}
           tooltip={item.disabled ? 'Bientôt disponible' : item.title}
           className={cn(item.disabled && 'opacity-40 cursor-not-allowed')}
