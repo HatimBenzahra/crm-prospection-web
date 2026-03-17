@@ -20,19 +20,35 @@ const PERIOD_PRESETS = {
   },
   last6h: () => {
     const now = new Date()
-    return { from: new Date(now.getTime() - 6 * 3600000).toISOString(), to: now.toISOString(), label: '6 dernières heures' }
+    return {
+      from: new Date(now.getTime() - 6 * 3600000).toISOString(),
+      to: now.toISOString(),
+      label: '6 dernières heures',
+    }
   },
   last3h: () => {
     const now = new Date()
-    return { from: new Date(now.getTime() - 3 * 3600000).toISOString(), to: now.toISOString(), label: '3 dernières heures' }
+    return {
+      from: new Date(now.getTime() - 3 * 3600000).toISOString(),
+      to: now.toISOString(),
+      label: '3 dernières heures',
+    }
   },
   last1h: () => {
     const now = new Date()
-    return { from: new Date(now.getTime() - 3600000).toISOString(), to: now.toISOString(), label: 'Dernière heure' }
+    return {
+      from: new Date(now.getTime() - 3600000).toISOString(),
+      to: now.toISOString(),
+      label: 'Dernière heure',
+    }
   },
   last30m: () => {
     const now = new Date()
-    return { from: new Date(now.getTime() - 30 * 60000).toISOString(), to: now.toISOString(), label: '30 dernières minutes' }
+    return {
+      from: new Date(now.getTime() - 30 * 60000).toISOString(),
+      to: now.toISOString(),
+      label: '30 dernières minutes',
+    }
   },
   morning: () => {
     const now = new Date()
@@ -44,14 +60,14 @@ const PERIOD_PRESETS = {
     const now = new Date()
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0)
     const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0, 0)
-    return { from: start.toISOString(), to: end.toISOString(), label: "Cet après-midi (12h-18h)" }
+    return { from: start.toISOString(), to: end.toISOString(), label: 'Cet après-midi (12h-18h)' }
   },
 }
 
 export default function KioskLocationPage() {
   const devicesQuery = useKioskDevices()
   const gpsDevicesQuery = useGpsDevices()
-  const { getCommercialName, getDeviceLabel } = useDeviceCommercialNames()
+  const { getCommercialName } = useDeviceCommercialNames()
 
   const [mode, setMode] = useState('live')
   const [selectedDeviceId, setSelectedDeviceId] = useState(null)
@@ -64,8 +80,14 @@ export default function KioskLocationPage() {
   const period = useMemo(() => {
     if (periodKey === 'custom' && customFrom) {
       const fromStr = `${customFrom}T${customFromTime || '00:00'}:00`
-      const toStr = customTo ? `${customTo}T${customToTime || '23:59'}:59` : `${customFrom}T${customToTime || '23:59'}:59`
-      return { from: new Date(fromStr).toISOString(), to: new Date(toStr).toISOString(), label: 'Personnalisé' }
+      const toStr = customTo
+        ? `${customTo}T${customToTime || '23:59'}:59`
+        : `${customFrom}T${customToTime || '23:59'}:59`
+      return {
+        from: new Date(fromStr).toISOString(),
+        to: new Date(toStr).toISOString(),
+        label: 'Personnalisé',
+      }
     }
     return PERIOD_PRESETS[periodKey]?.() || PERIOD_PRESETS.today()
   }, [periodKey, customFrom, customTo, customFromTime, customToTime])
@@ -76,7 +98,7 @@ export default function KioskLocationPage() {
   )
 
   const routeDeviceKey = selectedDeviceId
-    ? (selectedDevice?.serialNumber || selectedDeviceId)
+    ? selectedDevice?.serialNumber || selectedDeviceId
     : undefined
 
   const allPositionsQuery = useGpsAllPositions(
@@ -87,7 +109,9 @@ export default function KioskLocationPage() {
 
   const routePositionsByDevice = useMemo(() => {
     const positions = allPositionsQuery.data?.positions || []
-    const valid = positions.filter(p => typeof p.latitude === 'number' && typeof p.longitude === 'number')
+    const valid = positions.filter(
+      p => typeof p.latitude === 'number' && typeof p.longitude === 'number'
+    )
     const grouped = new Map()
     for (const p of valid) {
       if (!grouped.has(p.deviceId)) {
@@ -101,9 +125,16 @@ export default function KioskLocationPage() {
   const allDevicesForFilter = useMemo(() => {
     const kioskDevices = (devicesQuery.data || [])
       .filter(d => d.latitude !== null && d.longitude !== null)
-      .map(d => ({ deviceId: d.deviceId, serialNumber: d.serialNumber, deviceName: d.deviceName || d.deviceId }))
-    const gpsDevices = (gpsDevicesQuery.data || [])
-      .map(d => ({ deviceId: d.deviceId, serialNumber: d.deviceId, deviceName: d.deviceName || d.deviceId }))
+      .map(d => ({
+        deviceId: d.deviceId,
+        serialNumber: d.serialNumber,
+        deviceName: d.deviceName || d.deviceId,
+      }))
+    const gpsDevices = (gpsDevicesQuery.data || []).map(d => ({
+      deviceId: d.deviceId,
+      serialNumber: d.deviceId,
+      deviceName: d.deviceName || d.deviceId,
+    }))
     const merged = new Map()
     for (const d of kioskDevices) {
       merged.set(d.serialNumber || d.deviceId, d)
@@ -118,7 +149,7 @@ export default function KioskLocationPage() {
 
   if (devicesQuery.isLoading) {
     return (
-      <div className="flex flex-1 flex-col gap-6 p-6">
+      <div className="flex flex-1 min-h-0 flex-col gap-6 p-6">
         <div className="flex items-center justify-center min-h-[300px]">
           <div className="text-center">
             <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
@@ -131,10 +162,12 @@ export default function KioskLocationPage() {
 
   if (devicesQuery.error) {
     return (
-      <div className="flex flex-1 flex-col gap-6 p-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Localisation</h1>
-          <p className="text-muted-foreground mt-1">Suivi en temps réel et trajets des commerciaux</p>
+      <div className="flex flex-1 min-h-0 flex-col gap-6 p-6">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Localisation</h1>
+          <p className="text-base leading-relaxed text-muted-foreground">
+            Suivi en temps réel et trajets des commerciaux
+          </p>
         </div>
         <KioskErrorState error={devicesQuery.error} onRetry={() => devicesQuery.refetch()} />
       </div>
@@ -142,37 +175,40 @@ export default function KioskLocationPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Localisation</h1>
-        <p className="text-muted-foreground mt-1">Suivi en temps réel et trajets des commerciaux</p>
+    <div className="flex flex-1 min-h-0 flex-col gap-6 p-6">
+      <div className="space-y-1">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Localisation</h1>
+        <p className="text-base leading-relaxed text-muted-foreground">
+          Suivi en temps réel et trajets des commerciaux
+        </p>
       </div>
 
-      <LocationTab
-        devices={devicesQuery.data || []}
-        loading={devicesQuery.isLoading}
-        mode={mode}
-        setMode={setMode}
-        selectedDeviceId={selectedDeviceId}
-        setSelectedDeviceId={setSelectedDeviceId}
-        periodKey={periodKey}
-        setPeriodKey={setPeriodKey}
-        periodLabel={period.label}
-        customFrom={customFrom}
-        setCustomFrom={setCustomFrom}
-        customTo={customTo}
-        setCustomTo={setCustomTo}
-        customFromTime={customFromTime}
-        setCustomFromTime={setCustomFromTime}
-        customToTime={customToTime}
-        setCustomToTime={setCustomToTime}
-        routePositionsByDevice={routePositionsByDevice}
-        routeLoading={allPositionsQuery.isLoading}
-        routeTotal={allPositionsQuery.data?.total || 0}
-        allDevicesForFilter={allDevicesForFilter}
-        getCommercialName={getCommercialName}
-        getDeviceLabel={getDeviceLabel}
-      />
+      <div className="flex-1 min-h-0">
+        <LocationTab
+          devices={devicesQuery.data || []}
+          loading={devicesQuery.isLoading}
+          mode={mode}
+          setMode={setMode}
+          selectedDeviceId={selectedDeviceId}
+          setSelectedDeviceId={setSelectedDeviceId}
+          periodKey={periodKey}
+          setPeriodKey={setPeriodKey}
+          periodLabel={period.label}
+          customFrom={customFrom}
+          setCustomFrom={setCustomFrom}
+          customTo={customTo}
+          setCustomTo={setCustomTo}
+          customFromTime={customFromTime}
+          setCustomFromTime={setCustomFromTime}
+          customToTime={customToTime}
+          setCustomToTime={setCustomToTime}
+          routePositionsByDevice={routePositionsByDevice}
+          routeLoading={allPositionsQuery.isLoading}
+          routeTotal={allPositionsQuery.data?.total || 0}
+          allDevicesForFilter={allDevicesForFilter}
+          getCommercialName={getCommercialName}
+        />
+      </div>
     </div>
   )
 }

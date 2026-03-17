@@ -4,6 +4,33 @@
 **Commit:** 0c1bdae
 **Branch:** main
 
+## OBSIDIAN BRAIN (MANDATORY CONTEXT)
+
+Before starting ANY work on this project, load context from the Obsidian vault using the `mcp_obsidian_read_note` tool.
+
+**Start here:**
+```
+mcp_obsidian_read_note(path="Prospection/Prospection Overview.md")
+```
+
+**Then read the relevant module notes based on your task:**
+
+| If working on... | Read these notes |
+|---|---|
+| Backend API / GraphQL | `Prospection/Backend/Backend Overview.md` then the specific module |
+| Frontend pages | `Prospection/Frontend/Frontend Overview.md` then the specific page |
+| Mobile app | `Prospection/Mobile/Mobile Overview.md` then the specific flow |
+| Door status logic | `Prospection/Flows/Door Status Machine.md` |
+| Recording / audio | `Prospection/Flows/Recording Pipeline.md` |
+| Commercial workflow | `Prospection/Flows/Commercial Journey.md` |
+| Gamification / badges | `Prospection/Flows/Gamification Flow.md` |
+| Database / Prisma | `Prospection/Infra/Database Schema.md` |
+| External services | `Prospection/Infra/Services Externes.md` |
+
+**Follow `[[wikilinks]]` in each note to navigate to related modules.**
+
+The vault has 45 notes covering every module, page, flow, and service. Use `mcp_obsidian_search_notes` to find specific topics.
+
 ## OVERVIEW
 
 Real estate door-to-door sales management system (prospection immobilière). Tracks commercials visiting buildings/apartments, manages zones, records audio monitoring, generates statistics. French-language domain.
