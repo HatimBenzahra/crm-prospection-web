@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Circle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   useKioskVersionMatrix,
   useKioskDeployHistory,
@@ -16,6 +17,7 @@ export default function KioskDeploymentsPage() {
   const deployMutation = useKioskDeploy()
 
   const [deployDialog, setDeployDialog] = useState({ open: false, data: null })
+  const [activeTab, setActiveTab] = useState('deploy')
   const [deployHistoryFilters, setDeployHistoryFilters] = useState({
     deviceId: 'all',
     limit: 20,
@@ -31,7 +33,12 @@ export default function KioskDeploymentsPage() {
 
   const deployHistoryQuery = useKioskDeployHistory(normalizedDeployHistoryFilters)
 
-  if (versionMatrixQuery.isLoading || deployHistoryQuery.isLoading || devicesQuery.isLoading) {
+  const initialLoading =
+    (!versionMatrixQuery.data && versionMatrixQuery.isLoading) ||
+    (!deployHistoryQuery.data && deployHistoryQuery.isLoading) ||
+    (!devicesQuery.data && devicesQuery.isLoading)
+
+  if (initialLoading) {
     return (
       <div className="flex flex-1 flex-col gap-6 p-6">
         <div className="flex items-center justify-center min-h-[300px]">
@@ -56,7 +63,11 @@ export default function KioskDeploymentsPage() {
         </div>
         <KioskErrorState
           error={mainError}
-          onRetry={() => { versionMatrixQuery.refetch(); deployHistoryQuery.refetch(); devicesQuery.refetch() }}
+          onRetry={() => {
+            versionMatrixQuery.refetch()
+            deployHistoryQuery.refetch()
+            devicesQuery.refetch()
+          }}
         />
       </div>
     )
@@ -64,21 +75,57 @@ export default function KioskDeploymentsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Déploiements</h1>
-        <p className="text-muted-foreground mt-1">
-          Pilotage des déploiements OTA et suivi des exécutions
-        </p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Déploiements</h1>
+          <p className="text-muted-foreground mt-1">
+            Pilotage des déploiements OTA et suivi des exécutions
+          </p>
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <Circle
+              className={`h-2.5 w-2.5 fill-current ${
+                versionMatrixQuery.isFetching || deployHistoryQuery.isFetching
+                  ? 'animate-pulse text-chart-2'
+                  : 'text-muted-foreground/60'
+              }`}
+            />
+            <span>
+              {versionMatrixQuery.isFetching || deployHistoryQuery.isFetching
+                ? 'Actualisation en cours'
+                : 'Données synchronisées'}
+            </span>
+          </div>
+        </div>
+
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => {
+            versionMatrixQuery.refetch()
+            deployHistoryQuery.refetch()
+            devicesQuery.refetch()
+          }}
+          disabled={versionMatrixQuery.isFetching || deployHistoryQuery.isFetching}
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${
+              versionMatrixQuery.isFetching || deployHistoryQuery.isFetching ? 'animate-spin' : ''
+            }`}
+          />
+          Rafraîchir
+        </Button>
       </div>
 
       <DeploymentsTab
         versionMatrix={versionMatrixQuery.data}
         deployHistory={deployHistoryQuery.data}
-        loading={versionMatrixQuery.isLoading || deployHistoryQuery.isLoading}
+        loading={initialLoading}
         onDeploy={device => setDeployDialog({ open: true, data: device })}
         deployHistoryFilters={deployHistoryFilters}
         setDeployHistoryFilters={setDeployHistoryFilters}
         devices={devicesQuery.data || []}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
       />
 
       <DeployDialog

@@ -387,7 +387,7 @@ export default function LogsTab({
 
             <div
               ref={terminalRef}
-              className="h-[min(64vh,720px)] overflow-y-auto bg-muted/20 px-2 py-2 space-y-1.5 font-mono"
+              className="h-[calc(100dvh-300px)] min-h-[420px] max-h-[760px] overflow-y-auto bg-muted/20 px-2 py-2 space-y-1.5 font-mono"
               style={{ scrollbarWidth: 'thin' }}
             >
               {terminalRows.map((log, index) => {
