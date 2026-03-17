@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { RefreshCw, Circle, AlertTriangle, AlertOctagon, Info } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { RefreshCw, Circle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -19,18 +18,6 @@ const formatRefreshTime = timestamp => {
     minute: '2-digit',
     second: '2-digit',
   })
-}
-
-const getLogSeverity = log => {
-  const level = (log?.level || '').toLowerCase()
-  if (level === 'error') return 'error'
-  if (level === 'warn' || level === 'warning') return 'warn'
-
-  const type = (log?.type || '').toLowerCase()
-  if (type.includes('error')) return 'error'
-  if (type.includes('warn')) return 'warn'
-
-  return 'info'
 }
 
 export default function KioskLogsPage() {
@@ -60,20 +47,7 @@ export default function KioskLogsPage() {
   const devicesQuery = useKioskDevices()
   const clearLogsMutation = useKioskClearLogs()
 
-  const rows = logsQuery.data?.logs || []
   const total = logsQuery.data?.total || 0
-  const severityStats = useMemo(() => {
-    return rows.reduce(
-      (acc, log) => {
-        const severity = getLogSeverity(log)
-        if (severity === 'error') acc.errors += 1
-        else if (severity === 'warn') acc.warnings += 1
-        else acc.info += 1
-        return acc
-      },
-      { errors: 0, warnings: 0, info: 0 }
-    )
-  }, [rows])
 
   if (logsQuery.isLoading || logTypesQuery.isLoading || devicesQuery.isLoading) {
     return (
@@ -100,7 +74,11 @@ export default function KioskLogsPage() {
         </div>
         <KioskErrorState
           error={mainError}
-          onRetry={() => { logsQuery.refetch(); logTypesQuery.refetch(); devicesQuery.refetch() }}
+          onRetry={() => {
+            logsQuery.refetch()
+            logTypesQuery.refetch()
+            devicesQuery.refetch()
+          }}
         />
       </div>
     )
@@ -120,8 +98,12 @@ export default function KioskLogsPage() {
             Supervision en direct des événements et incidents de la flotte
           </p>
           <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-            <Circle className={`h-2.5 w-2.5 fill-current ${logsQuery.isFetching ? 'animate-pulse text-chart-2' : 'text-muted-foreground/60'}`} />
-            <span>{logsQuery.isFetching ? 'Actualisation automatique en cours' : 'Auto-refresh actif'}</span>
+            <Circle
+              className={`h-2.5 w-2.5 fill-current ${logsQuery.isFetching ? 'animate-pulse text-chart-2' : 'text-muted-foreground/60'}`}
+            />
+            <span>
+              {logsQuery.isFetching ? 'Actualisation automatique en cours' : 'Auto-refresh actif'}
+            </span>
             <span>•</span>
             <span>Dernière mise à jour : {formatRefreshTime(logsQuery.dataUpdatedAt)}</span>
           </div>
@@ -138,38 +120,6 @@ export default function KioskLogsPage() {
         </Button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-destructive">Erreurs</span>
-              <AlertOctagon className="h-4 w-4 text-destructive" />
-            </div>
-            <p className="mt-2 text-2xl font-bold tabular-nums text-destructive">{severityStats.errors}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-chart-5/30 bg-chart-5/10">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-chart-5">Warnings</span>
-              <AlertTriangle className="h-4 w-4 text-chart-5" />
-            </div>
-            <p className="mt-2 text-2xl font-bold tabular-nums text-chart-5">{severityStats.warnings}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-500/30 bg-blue-500/10">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-blue-600">Info</span>
-              <Info className="h-4 w-4 text-blue-600" />
-            </div>
-            <p className="mt-2 text-2xl font-bold tabular-nums text-blue-600">{severityStats.info}</p>
-          </CardContent>
-        </Card>
-      </div>
-
       <LogsTab
         logs={logsQuery.data}
         logTypes={logTypesQuery.data || []}
@@ -178,6 +128,9 @@ export default function KioskLogsPage() {
         setFilters={setLogFilters}
         onClearLogs={() => clearLogsMutation.mutate()}
         devices={devicesQuery.data || []}
+        isFetching={logsQuery.isFetching}
+        onRefresh={() => logsQuery.refetch()}
+        lastUpdatedAt={logsQuery.dataUpdatedAt}
       />
     </div>
   )
