@@ -21,6 +21,7 @@ import {
   Cpu,
   Radio,
 } from 'lucide-react'
+import useDeviceCommercialNames from '../useDeviceCommercialNames'
 
 const formatDateTime = value => {
   if (!value) return 'Inconnu'
@@ -137,9 +138,11 @@ const CopyButton = ({ value }) => {
 }
 
 export default function DeviceDetailSheet({ device, open, onClose, onCommand, onRename }) {
+  const { getCommercialName } = useDeviceCommercialNames()
   const batteryLevel = Number(device?.batteryLevel) || 0
   const batteryWidth = Math.min(100, Math.max(0, batteryLevel))
   const pendingCount = device?.pendingCommands?.length || 0
+  const commercialName = getCommercialName(device)
 
   return (
     <Sheet open={open} onOpenChange={state => (!state ? onClose() : null)}>
@@ -147,6 +150,13 @@ export default function DeviceDetailSheet({ device, open, onClose, onCommand, on
         <SheetHeader className="shrink-0 px-5 pt-5 pb-4 border-b border-border/50">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
+              <p
+                className={`text-sm font-semibold leading-tight truncate ${
+                  commercialName ? 'text-primary' : 'text-muted-foreground'
+                }`}
+              >
+                {commercialName || 'Aucun commercial assigné'}
+              </p>
               <SheetTitle className="text-lg font-bold leading-tight truncate">
                 {device?.deviceName || 'Tablette'}
               </SheetTitle>

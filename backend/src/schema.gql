@@ -255,6 +255,14 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+type DeviceMapping {
+  commercialName: String!
+  createdAt: DateTime!
+  deviceId: String!
+  id: Int!
+  updatedAt: DateTime!
+}
+
 type Directeur {
   adresse: String
   createdAt: DateTime!
@@ -305,6 +313,34 @@ type ExtractionQueueItemDto {
 type GlobalSearchResult {
   groups: [SearchResultGroup!]!
   totalCount: Int!
+}
+
+type GpsHistoryResponse {
+  positions: [GpsPosition!]!
+  total: Int!
+}
+
+type GpsPosition {
+  accuracy: Float
+  batteryLevel: Int
+  createdAt: DateTime!
+  deviceId: String!
+  deviceName: String
+  id: Int!
+  isOnline: Boolean!
+  latitude: Float!
+  longitude: Float!
+  recordedAt: DateTime!
+}
+
+input GpsPositionInput {
+  accuracy: Float
+  batteryLevel: Int
+  deviceId: String!
+  deviceName: String
+  isOnline: Boolean
+  latitude: Float!
+  longitude: Float!
 }
 
 type HistoriqueZone {
@@ -464,6 +500,7 @@ type Mutation {
   recalculateAllStats: String!
   refreshToken(refreshToken: String!): AuthResponse!
   removeCommercial(id: Int!): Commercial!
+  removeDeviceMapping(deviceId: String!): DeviceMapping!
   removeDirecteur(id: Int!): Directeur!
   removeEtageFromImmeuble(id: Int!): Immeuble!
   removeImmeuble(id: Int!): Immeuble!
@@ -475,7 +512,9 @@ type Mutation {
   removeZone(id: Int!): Zone!
   requestRecordingUpload(input: RequestRecordingUploadInput!): RecordingUploadDetails!
   revokeBadge(id: Int!): MappingResult!
+  saveGpsPositions(input: SaveGpsPositionsInput!): SaveGpsPositionsResponse!
   seedBadges: SeedBadgesResult!
+  setDeviceCommercial(input: SetDeviceCommercialInput!): DeviceMapping!
   startMonitoring(input: StartMonitoringInput!): LiveKitConnectionDetails!
   startRecording(input: StartRecordingInput!): RecordingResult!
   stopMonitoring(input: StopMonitoringInput!): Boolean!
@@ -585,6 +624,7 @@ type Query {
   contratsByCommercial(commercialId: Int!): [ContratValideType!]!
   contratsByManager(managerId: Int!): [ContratValideType!]!
   currentUserAssignment(userId: Int!, userType: UserType!): ZoneEnCours
+  deviceMappings: [DeviceMapping!]!
   directeur(id: Int!): Directeur!
   directeurs: [Directeur!]!
   egressState(egressId: String!): EgressState!
@@ -597,6 +637,11 @@ type Query {
   getRecordingSpeechScores(keys: [String!]!): [SpeechScoreDto!]!
   getStreamingUrl(key: String!): String!
   globalSearch(limit: Int! = 5, query: String!): GlobalSearchResult!
+  gpsAllPositions(deviceId: String, from: String!, limit: Int, to: String!): GpsHistoryResponse!
+  gpsDailyRoute(date: String!, deviceId: String!): GpsHistoryResponse!
+  gpsDevices: [GpsPosition!]!
+  gpsHistory(deviceId: String!, from: String, limit: Int, to: String): GpsHistoryResponse!
+  gpsLatestPositions: [GpsPosition!]!
   immeuble(id: Int!): Immeuble!
   immeubles: [Immeuble!]!
   listAllRecordings(roomNames: [String!]!): PaginatedRecordingsResult!
@@ -744,6 +789,15 @@ enum RoleUtilisateur {
   MANAGER
 }
 
+input SaveGpsPositionsInput {
+  positions: [GpsPositionInput!]!
+}
+
+type SaveGpsPositionsResponse {
+  saved: Int!
+  success: Boolean!
+}
+
 type SearchResultGroup {
   category: String!
   items: [SearchResultItem!]!
@@ -763,6 +817,11 @@ type SeedBadgesResult {
   skipped: Int!
   success: Boolean!
   total: Int!
+}
+
+input SetDeviceCommercialInput {
+  commercialName: String!
+  deviceId: String!
 }
 
 type SpeechScoreDto {

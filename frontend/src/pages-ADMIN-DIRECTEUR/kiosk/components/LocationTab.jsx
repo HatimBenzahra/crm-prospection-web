@@ -1,18 +1,19 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
-import MapboxMap, { Marker, NavigationControl, Popup } from 'react-map-gl/mapbox'
+import MapboxMap, { Marker, NavigationControl, Popup, Source, Layer } from 'react-map-gl/mapbox'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   MapPin, Wifi, Battery, BatteryLow, BatteryMedium, BatteryFull, Info,
-  Maximize, Minimize, Mountain, Building2, Layers, Crosshair,
+  Maximize, Minimize, Mountain, Building2, Layers, Crosshair, Route, Clock,
+  Calendar, ChevronRight, ChevronLeft, Navigation2, Flag, Users,
 } from 'lucide-react'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN
-if (MAPBOX_TOKEN) {
-  mapboxgl.accessToken = MAPBOX_TOKEN
-}
+if (MAPBOX_TOKEN) mapboxgl.accessToken = MAPBOX_TOKEN
 
 const MAP_STYLES = [
   { url: 'mapbox://styles/mapbox/streets-v12', label: 'Plan' },
@@ -33,6 +34,99 @@ const BUILDINGS_LAYER_DEF = {
     'fill-extrusion-base': ['get', 'min_height'],
     'fill-extrusion-opacity': 0.6,
   },
+}
+
+const ROUTE_COLORS = [
+  '#6366f1', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6',
+  '#06b6d4', '#ec4899', '#84cc16', '#ef4444', '#14b8a6',
+]
+
+const haversineDistance = (lat1, lng1, lat2, lng2) => {
+  const R = 6371000
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function detectStops(positions) {
+  const STOP_THRESHOLD_METERS = 50
+  const STOP_MIN_DURATION_MS = 5 * 60 * 1000
+  const stops = []
+  let stopStart = null
+  for (let i = 1; i < positions.length; i++) {
+    const prev = positions[i - 1]
+    const curr = positions[i]
+    const dist = haversineDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude)
+    if (dist < STOP_THRESHOLD_METERS) {
+      if (!stopStart) stopStart = { index: i - 1, position: prev }
+    } else {
+      if (stopStart) {
+        const duration = new Date(prev.recordedAt) - new Date(stopStart.position.recordedAt)
+        if (duration >= STOP_MIN_DURATION_MS) {
+          stops.push({
+            type: 'stop',
+            latitude: stopStart.position.latitude,
+            longitude: stopStart.position.longitude,
+            startTime: stopStart.position.recordedAt,
+            endTime: prev.recordedAt,
+            duration,
+          })
+        }
+        stopStart = null
+      }
+    }
+  }
+  if (stopStart) {
+    const last = positions[positions.length - 1]
+    const duration = new Date(last.recordedAt) - new Date(stopStart.position.recordedAt)
+    if (duration >= STOP_MIN_DURATION_MS) {
+      stops.push({
+        type: 'stop',
+        latitude: stopStart.position.latitude,
+        longitude: stopStart.position.longitude,
+        startTime: stopStart.position.recordedAt,
+        endTime: last.recordedAt,
+        duration,
+      })
+    }
+  }
+  return stops
+}
+
+function buildEnrichedEvents(positions, stops) {
+  if (positions.length < 1) return []
+  const first = positions[0]
+  const last = positions[positions.length - 1]
+  const allEvents = [
+    { type: 'departure', time: first.recordedAt, latitude: first.latitude, longitude: first.longitude, _key: 'departure' },
+    ...stops.map(s => ({ ...s, _key: `stop-${s.startTime}` })),
+    { type: 'arrival', time: last.recordedAt, latitude: last.latitude, longitude: last.longitude, _key: 'arrival' },
+  ]
+  const result = []
+  for (let i = 0; i < allEvents.length; i++) {
+    result.push(allEvents[i])
+    if (i < allEvents.length - 1) {
+      const startTime = allEvents[i].type === 'departure' ? allEvents[i].time : allEvents[i].endTime
+      const endTime = allEvents[i + 1].type === 'arrival' ? allEvents[i + 1].time : allEvents[i + 1].startTime
+      const startMs = new Date(startTime).getTime()
+      const endMs = new Date(endTime).getTime()
+      const durationMs = Math.max(0, endMs - startMs)
+      const segPositions = positions.filter(p => {
+        const t = new Date(p.recordedAt).getTime()
+        return t >= startMs && t <= endMs
+      })
+      let distMeters = 0
+      for (let j = 1; j < segPositions.length; j++) {
+        distMeters += haversineDistance(
+          segPositions[j - 1].latitude, segPositions[j - 1].longitude,
+          segPositions[j].latitude, segPositions[j].longitude
+        )
+      }
+      result.push({ type: 'movement', durationMs, distanceMeters: distMeters, _key: `mv-${startMs}-${endMs}` })
+    }
+  }
+  return result
 }
 
 const formatRelativeTime = value => {
@@ -64,6 +158,29 @@ const getBatteryColor = level => {
   return 'text-chart-2'
 }
 
+const getBatteryHexColor = level => {
+  if (!level || level < 20) return '#ef4444'
+  if (level < 50) return '#f97316'
+  return '#22c55e'
+}
+
+const formatTime = dateStr =>
+  new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+
+const formatDurationMs = ms => {
+  if (!ms || ms <= 0) return '—'
+  const hours = Math.floor(ms / 3600000)
+  const minutes = Math.floor((ms % 3600000) / 60000)
+  if (hours > 0) return `${hours}h ${minutes}min`
+  return `${minutes} min`
+}
+
+const formatDistanceKm = meters => {
+  if (!meters || meters <= 0) return '0 m'
+  if (meters < 1000) return `${Math.round(meters)} m`
+  return `${(meters / 1000).toFixed(1)} km`
+}
+
 const getDeviceInitial = device =>
   ((device.deviceName || device.deviceId || '?')[0] || '?').toUpperCase()
 
@@ -75,67 +192,181 @@ const AVATAR_COLORS = [
   'bg-chart-3/15 text-chart-3',
 ]
 
-const getAvatarColor = (_deviceId, index) =>
-  AVATAR_COLORS[index % AVATAR_COLORS.length]
+const getAvatarColor = (_id, index) => AVATAR_COLORS[index % AVATAR_COLORS.length]
 
-export default function LocationTab({ devices, loading }) {
-  const [selectedDeviceId, setSelectedDeviceId] = useState(null)
+const sanitizeId = id => (id || '').replace(/[^a-zA-Z0-9]/g, '_')
+
+export default function LocationTab({
+  devices,
+  loading,
+  mode,
+  setMode,
+  selectedDeviceId,
+  setSelectedDeviceId,
+  periodKey,
+  setPeriodKey,
+  periodLabel,
+  customFrom,
+  setCustomFrom,
+  customTo,
+  setCustomTo,
+  customFromTime,
+  setCustomFromTime,
+  customToTime,
+  setCustomToTime,
+  routePositionsByDevice,
+  routeLoading,
+  routeTotal,
+  allDevicesForFilter,
+  getCommercialName,
+  getDeviceLabel,
+}) {
   const [viewState, setViewState] = useState(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [is3DTerrain, setIs3DTerrain] = useState(false)
   const [is3DBuildings, setIs3DBuildings] = useState(false)
   const [mapStyleIndex, setMapStyleIndex] = useState(0)
   const [isMapLoaded, setIsMapLoaded] = useState(false)
+  const [trajetPopupPos, setTrajetPopupPos] = useState(null)
+  const [focusedIndex, setFocusedIndex] = useState(null)
+  const [selectedStopIndex, setSelectedStopIndex] = useState(null)
 
   const mapRef = useRef(null)
   const containerRef = useRef(null)
   const is3DTerrainRef = useRef(false)
   const is3DBuildingsRef = useRef(false)
+  const timelineRef = useRef(null)
 
   const devicesWithGps = useMemo(
-    () =>
-      (devices || []).filter(
-        device => typeof device.latitude === 'number' && typeof device.longitude === 'number'
-      ),
+    () => (devices || []).filter(d => typeof d.latitude === 'number' && typeof d.longitude === 'number'),
     [devices]
   )
 
   const selectedDevice = useMemo(
-    () => devicesWithGps.find(device => device.deviceId === selectedDeviceId) || null,
+    () => devicesWithGps.find(d => d.deviceId === selectedDeviceId) || null,
     [devicesWithGps, selectedDeviceId]
   )
 
-  const center = useMemo(() => {
+  const defaultCenter = useMemo(() => {
     if (!devicesWithGps.length) return { latitude: 48.86, longitude: 2.35, zoom: 10 }
-    const latitude =
-      devicesWithGps.reduce((sum, device) => sum + Number(device.latitude || 0), 0) /
-      devicesWithGps.length
-    const longitude =
-      devicesWithGps.reduce((sum, device) => sum + Number(device.longitude || 0), 0) /
-      devicesWithGps.length
-    return { latitude, longitude, zoom: 11 }
+    const lat = devicesWithGps.reduce((s, d) => s + Number(d.latitude || 0), 0) / devicesWithGps.length
+    const lng = devicesWithGps.reduce((s, d) => s + Number(d.longitude || 0), 0) / devicesWithGps.length
+    return { latitude: lat, longitude: lng, zoom: 11 }
   }, [devicesWithGps])
+
+  const deviceColorMap = useMemo(() => {
+    const map = new Map()
+    ;(allDevicesForFilter || []).forEach((d, i) => {
+      const color = ROUTE_COLORS[i % ROUTE_COLORS.length]
+      map.set(d.deviceId, color)
+      if (d.serialNumber) map.set(d.serialNumber, color)
+    })
+    return map
+  }, [allDevicesForFilter])
+
+  const routeEntries = useMemo(() => {
+    if (!routePositionsByDevice) return []
+    const entries = []
+    let fallbackIndex = 0
+    for (const [deviceId, positions] of routePositionsByDevice) {
+      if (positions.length < 2) { fallbackIndex++; continue }
+      const color = deviceColorMap.get(deviceId) || ROUTE_COLORS[fallbackIndex % ROUTE_COLORS.length]
+      const filterDevice = (allDevicesForFilter || []).find(
+        d => d.deviceId === deviceId || d.serialNumber === deviceId
+      )
+      const label = filterDevice
+        ? (getCommercialName(filterDevice) || filterDevice.deviceName || deviceId)
+        : deviceId
+      entries.push({ deviceId, safeId: sanitizeId(deviceId), positions, color, label })
+      fallbackIndex++
+    }
+    return entries
+  }, [routePositionsByDevice, deviceColorMap, allDevicesForFilter, getCommercialName])
+
+  const deviceStats = useMemo(() => {
+    const stats = new Map()
+    if (!routePositionsByDevice) return stats
+    for (const [deviceId, positions] of routePositionsByDevice) {
+      if (positions.length < 2) {
+        stats.set(deviceId, {
+          positions,
+          totalDistance: 0,
+          stops: [],
+          firstPos: positions[0] || null,
+          lastPos: positions[positions.length - 1] || null,
+        })
+        continue
+      }
+      let dist = 0
+      for (let i = 1; i < positions.length; i++) {
+        dist += haversineDistance(
+          positions[i - 1].latitude, positions[i - 1].longitude,
+          positions[i].latitude, positions[i].longitude
+        )
+      }
+      const stops = detectStops(positions)
+      stats.set(deviceId, {
+        positions,
+        totalDistance: dist,
+        stops,
+        firstPos: positions[0],
+        lastPos: positions[positions.length - 1],
+      })
+    }
+    return stats
+  }, [routePositionsByDevice])
+
+  const selectedStats = useMemo(() => {
+    if (!selectedDeviceId) return null
+    return deviceStats.get(selectedDeviceId) || null
+  }, [selectedDeviceId, deviceStats])
+
+  const selectedEnrichedEvents = useMemo(() => {
+    if (!selectedStats || selectedStats.positions.length < 2) return []
+    return buildEnrichedEvents(selectedStats.positions, selectedStats.stops)
+  }, [selectedStats])
+
+  const selectedStopEvents = useMemo(() => selectedStats?.stops || [], [selectedStats])
+
+  const visibleRouteEntry = useMemo(() => {
+    if (!selectedDeviceId) return null
+    return routeEntries.find(e => e.deviceId === selectedDeviceId) || null
+  }, [selectedDeviceId, routeEntries])
+
+  const entriesToDraw = useMemo(() => {
+    if (selectedDeviceId) return visibleRouteEntry ? [visibleRouteEntry] : []
+    return routeEntries
+  }, [selectedDeviceId, visibleRouteEntry, routeEntries])
 
   useEffect(() => { is3DTerrainRef.current = is3DTerrain }, [is3DTerrain])
   useEffect(() => { is3DBuildingsRef.current = is3DBuildings }, [is3DBuildings])
 
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
-    }
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    const handler = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', handler)
+    return () => document.removeEventListener('fullscreenchange', handler)
   }, [])
 
-  const handleCardClick = useCallback(device => {
-    setSelectedDeviceId(device.deviceId)
-    setViewState({
-      latitude: Number(device.latitude),
-      longitude: Number(device.longitude),
-      zoom: 14,
-      transitionDuration: 800,
-    })
-  }, [])
+  useEffect(() => {
+    if (mode === 'live') {
+      setTrajetPopupPos(null)
+      setFocusedIndex(null)
+      setSelectedStopIndex(null)
+    }
+  }, [mode])
+
+  useEffect(() => {
+    if (mode !== 'trajet' || !mapRef.current || !routePositionsByDevice) return
+    const positions = selectedDeviceId
+      ? (routePositionsByDevice.get(selectedDeviceId) || [])
+      : Array.from(routePositionsByDevice.values()).flat()
+    if (!positions.length) return
+    const bounds = new mapboxgl.LngLatBounds()
+    for (const p of positions) { bounds.extend([p.longitude, p.latitude]) }
+    try {
+      mapRef.current.fitBounds(bounds, { padding: 60, maxZoom: 16, duration: 900 })
+    } catch (_) {}
+  }, [mode, routePositionsByDevice, selectedDeviceId])
 
   const setupMapExtras = useCallback(() => {
     const map = mapRef.current?.getMap()
@@ -149,9 +380,7 @@ export default function LocationTab({ devices, loading }) {
           maxzoom: 14,
         })
       }
-      if (is3DTerrainRef.current) {
-        map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 })
-      }
+      if (is3DTerrainRef.current) map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 })
       if (is3DBuildingsRef.current && !map.getLayer('kiosk-3d-buildings')) {
         map.addLayer(BUILDINGS_LAYER_DEF)
       }
@@ -162,9 +391,7 @@ export default function LocationTab({ devices, loading }) {
     setIsMapLoaded(true)
     setupMapExtras()
     const map = mapRef.current?.getMap()
-    if (map) {
-      map.on('style.load', setupMapExtras)
-    }
+    if (map) map.on('style.load', setupMapExtras)
   }, [setupMapExtras])
 
   const handleToggle3DTerrain = useCallback(() => {
@@ -200,13 +427,9 @@ export default function LocationTab({ devices, loading }) {
     const next = !is3DBuildings
     try {
       if (next) {
-        if (!map.getLayer('kiosk-3d-buildings')) {
-          map.addLayer(BUILDINGS_LAYER_DEF)
-        }
+        if (!map.getLayer('kiosk-3d-buildings')) map.addLayer(BUILDINGS_LAYER_DEF)
       } else {
-        if (map.getLayer('kiosk-3d-buildings')) {
-          map.removeLayer('kiosk-3d-buildings')
-        }
+        if (map.getLayer('kiosk-3d-buildings')) map.removeLayer('kiosk-3d-buildings')
       }
       setIs3DBuildings(next)
       is3DBuildingsRef.current = next
@@ -219,20 +442,45 @@ export default function LocationTab({ devices, loading }) {
 
   const handleFullscreenToggle = useCallback(() => {
     try {
-      if (!document.fullscreenElement) {
-        containerRef.current?.requestFullscreen()
-      } else {
-        document.exitFullscreen()
-      }
+      if (!document.fullscreenElement) containerRef.current?.requestFullscreen()
+      else document.exitFullscreen()
     } catch (_) {}
   }, [])
 
   const handleCenterOnDevices = useCallback(() => {
-    if (!devicesWithGps.length || !mapRef.current) return
+    if (!mapRef.current) return
+    if (mode === 'trajet' && routePositionsByDevice) {
+      const positions = selectedDeviceId
+        ? (routePositionsByDevice.get(selectedDeviceId) || [])
+        : Array.from(routePositionsByDevice.values()).flat()
+      if (positions.length) {
+        const bounds = new mapboxgl.LngLatBounds()
+        for (const p of positions) { bounds.extend([p.longitude, p.latitude]) }
+        try { mapRef.current.fitBounds(bounds, { padding: 60, maxZoom: 16, duration: 800 }) } catch (_) {}
+        return
+      }
+    }
+    if (!devicesWithGps.length) return
     const bounds = new mapboxgl.LngLatBounds()
-    devicesWithGps.forEach(d => { bounds.extend([d.longitude, d.latitude]) })
-    mapRef.current.fitBounds(bounds, { padding: 80, maxZoom: 15, duration: 1000 })
-  }, [devicesWithGps])
+    for (const d of devicesWithGps) { bounds.extend([d.longitude, d.latitude]) }
+    try { mapRef.current.fitBounds(bounds, { padding: 80, maxZoom: 15, duration: 1000 }) } catch (_) {}
+  }, [devicesWithGps, mode, routePositionsByDevice, selectedDeviceId])
+
+  const handleCardClick = useCallback(device => {
+    setSelectedDeviceId(device.deviceId)
+    setViewState({
+      latitude: Number(device.latitude),
+      longitude: Number(device.longitude),
+      zoom: 14,
+      transitionDuration: 800,
+    })
+  }, [setSelectedDeviceId])
+
+  const handleEventClick = useCallback(event => {
+    if (mapRef.current && event.longitude != null && event.latitude != null) {
+      mapRef.current.flyTo({ center: [event.longitude, event.latitude], zoom: 16, duration: 700 })
+    }
+  }, [])
 
   if (loading) {
     return (
@@ -256,36 +504,164 @@ export default function LocationTab({ devices, loading }) {
     )
   }
 
-  if (!devicesWithGps.length) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 gap-4">
-        <div className="rounded-full bg-muted/40 p-6">
-          <MapPin className="h-10 w-10 text-muted-foreground/20" />
-        </div>
-        <div className="text-center space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">Aucune position GPS</p>
-          <p className="text-xs text-muted-foreground/60">
-            Les tablettes sans données de localisation ne sont pas affichées
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-4">
-      <div
-        ref={containerRef}
-        className="overflow-hidden rounded-xl shadow-md border border-border/40"
-      >
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-1 rounded-full bg-muted/40 p-1">
+          <button
+            type="button"
+            onClick={() => setMode('live')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              mode === 'live'
+                ? 'bg-background shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full bg-chart-2 ${mode === 'live' ? 'animate-pulse' : ''}`} />
+            Live
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('trajet')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              mode === 'trajet'
+                ? 'bg-background shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Route className="h-3.5 w-3.5" />
+            Trajet
+          </button>
+        </div>
+
+        {mode === 'live' && (
+          <>
+            <Select
+              value={selectedDeviceId || 'all'}
+              onValueChange={val => setSelectedDeviceId(val === 'all' ? null : val)}
+            >
+              <SelectTrigger className="w-48 h-9 text-sm">
+                <SelectValue placeholder="Tous les commerciaux" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les commerciaux</SelectItem>
+                {devicesWithGps.map(d => (
+                  <SelectItem key={d.deviceId} value={d.deviceId}>
+                    <span className="font-medium">{getCommercialName(d) || 'Non assigné'}</span>
+                    <span className="text-muted-foreground ml-1 text-[11px]">
+                      {d.deviceName || d.deviceId}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-chart-2/10 border border-chart-2/20">
+              <span className="h-1.5 w-1.5 rounded-full bg-chart-2 animate-pulse" />
+              <span className="text-[11px] font-semibold text-chart-2">En direct</span>
+            </div>
+          </>
+        )}
+
+        {mode === 'trajet' && (
+          <>
+            <Select value={periodKey} onValueChange={setPeriodKey}>
+              <SelectTrigger className="w-52 h-9 text-sm">
+                <Clock className="h-3.5 w-3.5 text-muted-foreground mr-1.5 shrink-0" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Période</div>
+                <SelectItem value="today">Aujourd&apos;hui</SelectItem>
+                <SelectItem value="yesterday">Hier</SelectItem>
+                <div className="h-px bg-border/50 my-1 mx-2" />
+                <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Tranches horaires</div>
+                <SelectItem value="morning">Ce matin (8h-12h)</SelectItem>
+                <SelectItem value="afternoon">Cet après-midi (12h-18h)</SelectItem>
+                <div className="h-px bg-border/50 my-1 mx-2" />
+                <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Durée glissante</div>
+                <SelectItem value="last30m">30 dernières minutes</SelectItem>
+                <SelectItem value="last1h">Dernière heure</SelectItem>
+                <SelectItem value="last3h">3 dernières heures</SelectItem>
+                <SelectItem value="last6h">6 dernières heures</SelectItem>
+                <div className="h-px bg-border/50 my-1 mx-2" />
+                <SelectItem value="custom">Intervalle personnalisé...</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={selectedDeviceId || 'all'}
+              onValueChange={val => {
+                setSelectedDeviceId(val === 'all' ? null : val)
+                setTrajetPopupPos(null)
+                setSelectedStopIndex(null)
+              }}
+            >
+              <SelectTrigger className="w-52 h-9 text-sm">
+                <Users className="h-3.5 w-3.5 text-muted-foreground mr-1.5 shrink-0" />
+                <SelectValue placeholder="Tous les commerciaux" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les commerciaux</SelectItem>
+                {(allDevicesForFilter || []).map(d => (
+                  <SelectItem key={d.deviceId} value={d.deviceId}>
+                    {getCommercialName(d) || d.deviceName || d.deviceId}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {routeLoading && (
+              <div className="flex items-center gap-1.5">
+                <div className="h-3.5 w-3.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                <span className="text-xs text-muted-foreground">Chargement...</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {mode === 'trajet' && periodKey === 'custom' && (
+        <div className="flex items-center gap-2 flex-wrap rounded-lg bg-muted/30 border border-border/50 px-3 py-2.5">
+          <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm text-muted-foreground">Du</span>
+          <input
+            type="date"
+            value={customFrom}
+            onChange={e => setCustomFrom(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <input
+            type="time"
+            value={customFromTime}
+            onChange={e => setCustomFromTime(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background px-2.5 text-sm text-foreground tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <span className="text-sm text-muted-foreground">au</span>
+          <input
+            type="date"
+            value={customTo || customFrom}
+            onChange={e => setCustomTo(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <input
+            type="time"
+            value={customToTime}
+            onChange={e => setCustomToTime(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background px-2.5 text-sm text-foreground tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+      )}
+
+      <div ref={containerRef} className="overflow-hidden rounded-xl shadow-md border border-border/40">
         <div className="relative">
           <MapboxMap
             ref={mapRef}
-            {...(viewState || center)}
+            {...(viewState || defaultCenter)}
             onMove={evt => setViewState(evt.viewState)}
             style={{ width: '100%', height: isFullscreen ? '100vh' : 520 }}
             mapStyle={MAP_STYLES[mapStyleIndex].url}
             onLoad={handleMapLoad}
+            onClick={() => { setTrajetPopupPos(null); setSelectedStopIndex(null) }}
           >
             <NavigationControl position="top-right" />
 
@@ -301,10 +677,7 @@ export default function LocationTab({ devices, loading }) {
                       : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {isFullscreen
-                    ? <Minimize className="h-4 w-4" />
-                    : <Maximize className="h-4 w-4" />
-                  }
+                  {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
                 </button>
 
                 <div className="h-px bg-border/50 mx-1" />
@@ -374,26 +747,175 @@ export default function LocationTab({ devices, loading }) {
               </div>
             )}
 
-            {devicesWithGps.map(device => {
+            {mode === 'trajet' && entriesToDraw.map(entry => {
+              const routeColor = selectedDeviceId ? '#6366f1' : entry.color
+              const geoJson = {
+                type: 'Feature',
+                geometry: {
+                  type: 'LineString',
+                  coordinates: entry.positions.map(p => [p.longitude, p.latitude]),
+                },
+                properties: {},
+              }
+              return (
+                <Source key={entry.safeId} id={`route-${entry.safeId}`} type="geojson" data={geoJson}>
+                  <Layer
+                    id={`route-shadow-${entry.safeId}`}
+                    type="line"
+                    paint={{ 'line-color': routeColor, 'line-width': 6, 'line-opacity': 0.15 }}
+                    layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+                  />
+                  <Layer
+                    id={`route-line-${entry.safeId}`}
+                    type="line"
+                    paint={{ 'line-color': routeColor, 'line-width': 3, 'line-opacity': 0.85 }}
+                    layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+                  />
+                  <Layer
+                    id={`route-arrows-${entry.safeId}`}
+                    type="symbol"
+                    layout={{
+                      'symbol-placement': 'line',
+                      'symbol-spacing': 80,
+                      'text-field': '▶',
+                      'text-size': 11,
+                      'text-keep-upright': false,
+                      'text-rotation-alignment': 'map',
+                      'text-pitch-alignment': 'viewport',
+                      'text-allow-overlap': true,
+                    }}
+                    paint={{
+                      'text-color': routeColor,
+                      'text-opacity': 0.65,
+                      'text-halo-color': '#ffffff',
+                      'text-halo-width': 1,
+                    }}
+                  />
+                </Source>
+              )
+            })}
+
+            {mode === 'trajet' && entriesToDraw.map(entry => {
+              const firstPos = entry.positions[0]
+              const lastPos = entry.positions[entry.positions.length - 1]
+              return (
+                <React.Fragment key={`endpts-${entry.safeId}`}>
+                  <Marker latitude={firstPos.latitude} longitude={firstPos.longitude} anchor="center">
+                    <div className="relative flex flex-col items-center">
+                      <div className="h-5 w-5 rounded-full bg-chart-2 border-2 border-white shadow-md flex items-center justify-center">
+                        <div className="h-2 w-2 rounded-full bg-white" />
+                      </div>
+                      <span className="mt-0.5 text-[9px] font-bold text-chart-2 bg-white/90 rounded px-1 shadow-sm whitespace-nowrap">
+                        Départ
+                      </span>
+                    </div>
+                  </Marker>
+                  <Marker latitude={lastPos.latitude} longitude={lastPos.longitude} anchor="center">
+                    <div className="relative flex flex-col items-center">
+                      <div className="h-5 w-5 rounded-full bg-destructive border-2 border-white shadow-md flex items-center justify-center">
+                        <div className="h-2 w-2 rounded-full bg-white" />
+                      </div>
+                      <span className="mt-0.5 text-[9px] font-bold text-destructive bg-white/90 rounded px-1 shadow-sm whitespace-nowrap">
+                        Arrivée
+                      </span>
+                    </div>
+                  </Marker>
+                </React.Fragment>
+              )
+            })}
+
+            {mode === 'trajet' && selectedDeviceId && visibleRouteEntry &&
+              visibleRouteEntry.positions.map((pos, index) => {
+                const isFirst = index === 0
+                const isLast = index === visibleRouteEntry.positions.length - 1
+                if (isFirst || isLast) return null
+                const isFocused = focusedIndex === index
+                const progress = index / (visibleRouteEntry.positions.length - 1)
+                const opacity = 0.3 + progress * 0.7
+                return (
+                  <Marker
+                    key={pos.id ?? `pos-${index}`}
+                    latitude={pos.latitude}
+                    longitude={pos.longitude}
+                    anchor="center"
+                    onClick={evt => {
+                      evt.originalEvent.stopPropagation()
+                      setTrajetPopupPos(pos)
+                      setFocusedIndex(index)
+                      setSelectedStopIndex(null)
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="focus:outline-none"
+                      onClick={evt => {
+                        evt.stopPropagation()
+                        setTrajetPopupPos(pos)
+                        setFocusedIndex(index)
+                        setSelectedStopIndex(null)
+                      }}
+                    >
+                      <div
+                        className="rounded-full border border-white shadow-sm transition-transform hover:scale-150"
+                        style={{
+                          width: isFocused ? 10 : 7,
+                          height: isFocused ? 10 : 7,
+                          backgroundColor: `rgba(99,102,241,${opacity})`,
+                        }}
+                      />
+                    </button>
+                  </Marker>
+                )
+              })
+            }
+
+            {mode === 'trajet' && selectedDeviceId && selectedStopEvents.map((stop, idx) => (
+              <Marker
+                key={stop.startTime || `stop-${idx}`}
+                latitude={stop.latitude}
+                longitude={stop.longitude}
+                anchor="center"
+                onClick={evt => {
+                  evt.originalEvent.stopPropagation()
+                  setSelectedStopIndex(idx)
+                  setTrajetPopupPos(null)
+                  setFocusedIndex(null)
+                }}
+              >
+                <button
+                  type="button"
+                  className="focus:outline-none group"
+                  onClick={evt => {
+                    evt.stopPropagation()
+                    setSelectedStopIndex(idx)
+                    setTrajetPopupPos(null)
+                    setFocusedIndex(null)
+                  }}
+                >
+                  <div className="h-4 w-4 rounded-full bg-chart-5 border-2 border-white shadow-md group-hover:scale-125 transition-transform" />
+                </button>
+              </Marker>
+            ))}
+
+            {mode === 'live' && devicesWithGps.map(device => {
               const isOnline = device.online
               const isSelected = device.deviceId === selectedDeviceId
-
               return (
                 <Marker
                   key={device.deviceId}
                   latitude={Number(device.latitude)}
                   longitude={Number(device.longitude)}
                   anchor="center"
-                  onClick={event => {
-                    event.originalEvent.stopPropagation()
+                  onClick={evt => {
+                    evt.originalEvent.stopPropagation()
                     setSelectedDeviceId(device.deviceId)
                   }}
                 >
                   <button
                     type="button"
                     className="relative cursor-pointer focus:outline-none"
-                    onClick={event => {
-                      event.stopPropagation()
+                    onClick={evt => {
+                      evt.stopPropagation()
                       setSelectedDeviceId(device.deviceId)
                     }}
                   >
@@ -413,7 +935,7 @@ export default function LocationTab({ devices, loading }) {
               )
             })}
 
-            {selectedDevice && (
+            {mode === 'live' && selectedDevice && (
               <Popup
                 latitude={Number(selectedDevice.latitude)}
                 longitude={Number(selectedDevice.longitude)}
@@ -426,6 +948,9 @@ export default function LocationTab({ devices, loading }) {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-semibold text-sm truncate leading-tight">
+                        {getCommercialName(selectedDevice) || 'Non assigné'}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5">
                         {selectedDevice.deviceName || selectedDevice.deviceId}
                       </p>
                       {selectedDevice.model && (
@@ -481,109 +1006,439 @@ export default function LocationTab({ devices, loading }) {
                         {formatRelativeTime(selectedDevice.lastSeen)}
                       </span>
                     </div>
-
-                    {selectedDevice.locationAccuracy != null && (
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-muted-foreground">Précision GPS</span>
-                        <span className="text-[11px] font-medium">
-                          ±{Math.round(selectedDevice.locationAccuracy)} m
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-1 border-t border-border/40">
-                    <p className="text-[10px] text-muted-foreground/70 font-mono tabular-nums">
-                      {Number(selectedDevice.latitude).toFixed(5)},{' '}
-                      {Number(selectedDevice.longitude).toFixed(5)}
-                    </p>
                   </div>
                 </div>
               </Popup>
+            )}
+
+            {mode === 'trajet' && trajetPopupPos && (
+              <Popup
+                latitude={trajetPopupPos.latitude}
+                longitude={trajetPopupPos.longitude}
+                anchor="top"
+                onClose={() => setTrajetPopupPos(null)}
+                closeButton
+                maxWidth="200px"
+              >
+                <div className="p-3 space-y-2 min-w-[160px]">
+                  <p className="text-xs font-semibold">
+                    {visibleRouteEntry?.label || (selectedDevice ? getCommercialName(selectedDevice) : null) || 'Non assigné'}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span className="text-xs font-semibold">
+                      {new Date(trajetPopupPos.recordedAt).toLocaleTimeString('fr-FR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                  {trajetPopupPos.batteryLevel != null && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-muted-foreground">Batterie</span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-16 bg-muted/50 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${trajetPopupPos.batteryLevel}%`,
+                              backgroundColor: getBatteryHexColor(trajetPopupPos.batteryLevel),
+                            }}
+                          />
+                        </div>
+                        <span className="text-[11px] font-medium tabular-nums">
+                          {trajetPopupPos.batteryLevel}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Popup>
+            )}
+
+            {mode === 'trajet' && selectedStopIndex !== null && selectedStopEvents[selectedStopIndex] && (
+              <Popup
+                latitude={selectedStopEvents[selectedStopIndex].latitude}
+                longitude={selectedStopEvents[selectedStopIndex].longitude}
+                anchor="top"
+                onClose={() => setSelectedStopIndex(null)}
+                closeButton
+                maxWidth="200px"
+              >
+                <div className="p-3 space-y-2 min-w-[160px]">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-full bg-chart-5 shrink-0" />
+                    <p className="text-xs font-semibold">
+                      Arrêt · {formatDurationMs(selectedStopEvents[selectedStopIndex].duration)}
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {formatTime(selectedStopEvents[selectedStopIndex].startTime)}
+                    {' — '}
+                    {formatTime(selectedStopEvents[selectedStopIndex].endTime)}
+                  </p>
+                </div>
+              </Popup>
+            )}
+
+            {mode === 'trajet' && !selectedDeviceId && routeEntries.length > 0 && (
+              <div className="absolute bottom-8 left-3 z-10 pointer-events-none">
+                <div className="rounded-xl bg-background/90 backdrop-blur-sm border border-border/50 shadow-lg px-3 py-2.5 flex flex-col gap-1.5">
+                  {routeEntries.map(entry => (
+                    <div key={entry.safeId} className="flex items-center gap-2">
+                      <div
+                        className="h-2.5 w-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: entry.color }}
+                      />
+                      <span className="text-[11px] font-medium text-foreground">{entry.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </MapboxMap>
         </div>
       </div>
 
       {!isFullscreen && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-0.5">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              Tablettes géolocalisées
-            </h3>
-            <span className="text-xs text-muted-foreground">{devicesWithGps.length} tablette{devicesWithGps.length !== 1 ? 's' : ''}</span>
-          </div>
+        <>
+          {mode === 'live' ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-0.5">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                  Commerciaux en terrain
+                </h3>
+                <span className="text-xs text-muted-foreground">
+                  {devicesWithGps.length} commercial{devicesWithGps.length !== 1 ? 'x' : ''}
+                </span>
+              </div>
 
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-0.5 px-0.5">
-            {devicesWithGps.map((device, index) => {
-              const isSelected = device.deviceId === selectedDeviceId
-              const BattIcon = getBatteryIcon(device.batteryLevel)
-              const battColor = getBatteryColor(device.batteryLevel)
-              const avatarClass = getAvatarColor(device.deviceId, index)
-
-              return (
-                <button
-                  key={device.deviceId}
-                  type="button"
-                  onClick={() => handleCardClick(device)}
-                  className={`shrink-0 flex flex-col gap-2.5 rounded-xl border p-3.5 w-[175px] text-left transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30 ${
-                    isSelected
-                      ? 'border-primary/40 bg-primary/5 shadow-sm'
-                      : 'border-border/60 bg-card hover:border-primary/20 hover:bg-muted/20'
-                  }`}
+              {devicesWithGps.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <div className="rounded-full bg-muted/40 p-5">
+                    <MapPin className="h-8 w-8 text-muted-foreground/20" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Aucune position disponible</p>
+                </div>
+              ) : (
+                <div
+                  className="flex gap-3 overflow-x-auto pb-2 -mx-0.5 px-0.5"
+                  style={{ scrollbarWidth: 'none' }}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${avatarClass}`}
+                  {devicesWithGps.map((device, index) => {
+                    const isSelected = device.deviceId === selectedDeviceId
+                    const BattIcon = getBatteryIcon(device.batteryLevel)
+                    const battColor = getBatteryColor(device.batteryLevel)
+                    const avatarClass = getAvatarColor(device.deviceId, index)
+                    const commercialName = getCommercialName(device)
+
+                    return (
+                      <div
+                        key={device.deviceId}
+                        className={`shrink-0 flex flex-col gap-2.5 rounded-xl border p-3.5 w-[175px] transition-all ${
+                          isSelected
+                            ? 'border-primary/40 bg-primary/5 shadow-sm'
+                            : 'border-border/60 bg-card hover:border-primary/20 hover:bg-muted/20'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleCardClick(device)}
+                          className="flex items-center gap-2.5 text-left focus:outline-none focus:ring-2 focus:ring-primary/30 rounded-lg"
+                        >
+                          <div
+                            className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${avatarClass}`}
+                          >
+                            {getDeviceInitial(device)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold truncate leading-tight">
+                              {commercialName || 'Non assigné'}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground truncate leading-tight mt-0.5">
+                              {device.deviceName || device.deviceId}
+                            </p>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                                  device.online ? 'bg-chart-2' : 'bg-muted-foreground/40'
+                                }`}
+                              />
+                              <span className="text-[10px] text-muted-foreground truncate">
+                                {device.online
+                                  ? device.lastSeen
+                                    ? `En ligne · ${formatRelativeTime(device.lastSeen)}`
+                                    : 'En ligne'
+                                  : device.lastSeen
+                                  ? `Hors ligne · ${formatRelativeTime(device.lastSeen)}`
+                                  : 'Hors ligne'}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+
+                        <div className="flex items-center gap-1.5">
+                          <BattIcon className={`h-3 w-3 shrink-0 ${battColor}`} />
+                          <div className="flex-1 bg-muted/40 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${
+                                (device.batteryLevel || 0) < 20
+                                  ? 'bg-destructive'
+                                  : (device.batteryLevel || 0) < 50
+                                  ? 'bg-chart-5'
+                                  : 'bg-chart-2'
+                              }`}
+                              style={{ width: `${device.batteryLevel || 0}%` }}
+                            />
+                          </div>
+                          <span className={`text-[10px] font-medium tabular-nums ${battColor}`}>
+                            {device.batteryLevel || 0}%
+                          </span>
+                        </div>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto px-0 py-0 text-[11px] text-primary/70 hover:text-primary hover:bg-transparent gap-0.5 self-start"
+                          onClick={() => {
+                            setSelectedDeviceId(device.deviceId)
+                            setMode('trajet')
+                          }}
+                        >
+                          Voir trajet
+                          <ChevronRight className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border/40 bg-card/50 overflow-hidden">
+              {routeLoading ? (
+                <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+                  <div className="h-5 w-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                  <span className="text-sm">Chargement des trajets...</span>
+                </div>
+              ) : selectedDeviceId ? (
+                <>
+                  <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDeviceId(null)
+                        setTrajetPopupPos(null)
+                        setSelectedStopIndex(null)
+                      }}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
                     >
-                      {getDeviceInitial(device)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold truncate leading-tight">
-                        {device.deviceName || device.deviceId}
-                      </p>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-                            device.online ? 'bg-chart-2' : 'bg-muted-foreground/40'
-                          }`}
-                        />
-                        <span className="text-[10px] text-muted-foreground">
-                          {device.online ? 'En ligne' : 'Hors ligne'}
-                        </span>
-                      </div>
-                    </div>
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                      Voir tous les commerciaux
+                    </button>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <BattIcon className={`h-3 w-3 shrink-0 ${battColor}`} />
-                      <div className="flex-1 bg-muted/40 rounded-full h-1.5 overflow-hidden">
+                  {selectedStats && selectedStats.positions.length >= 2 ? (
+                    <>
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                        <div className="flex items-center gap-2">
+                          <Navigation2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold leading-tight">
+                              {visibleRouteEntry?.label || 'Non assigné'}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                              {periodLabel}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-semibold">
+                            {formatDistanceKm(selectedStats.totalDistance)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {selectedStats.stops.length} arrêt{selectedStats.stops.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div
+                        ref={timelineRef}
+                        className="overflow-y-auto px-4 py-3"
+                        style={{ maxHeight: 300, scrollbarWidth: 'thin' }}
+                      >
+                        {selectedEnrichedEvents.map((event, idx) => {
+                          const isNotLast = idx < selectedEnrichedEvents.length - 1
+
+                          if (event.type === 'movement') {
+                            return (
+                              <div key={event._key} className="flex gap-3">
+                                <div className="w-5 shrink-0 flex justify-center">
+                                  <div className="bg-border/50 min-h-7" style={{ width: 1 }} />
+                                </div>
+                                <div className="flex items-center py-1 min-h-7">
+                                  <p className="text-[11px] text-muted-foreground/60 italic">
+                                    {`En déplacement${event.durationMs > 60000 ? ` · ${formatDurationMs(event.durationMs)}` : ''}${event.distanceMeters > 100 ? ` · ${formatDistanceKm(event.distanceMeters)}` : ''}`}
+                                  </p>
+                                </div>
+                              </div>
+                            )
+                          }
+
+                          const isDeparture = event.type === 'departure'
+                          const isArrival = event.type === 'arrival'
+                          const isStop = event.type === 'stop'
+
+                          return (
+                            <div key={event._key} className="flex gap-3">
+                              <div className="flex flex-col items-center w-5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEventClick(event)}
+                                  className={`h-5 w-5 shrink-0 rounded-full border-2 border-background shadow-sm flex items-center justify-center z-10 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary/30 ${
+                                    isDeparture
+                                      ? 'bg-chart-2'
+                                      : isArrival
+                                      ? 'bg-muted-foreground'
+                                      : 'bg-destructive'
+                                  }`}
+                                >
+                                  {isArrival && <Flag className="h-2.5 w-2.5 text-white" />}
+                                  {isDeparture && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                                </button>
+                                {isNotLast && (
+                                  <div className="flex-1 bg-border/50 min-h-3" style={{ width: 1 }} />
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleEventClick(event)}
+                                className="flex-1 pb-3 pt-0.5 text-left focus:outline-none hover:opacity-75 transition-opacity"
+                              >
+                                {isDeparture && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-chart-2 tabular-nums">
+                                      {formatTime(event.time)}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">Départ</span>
+                                  </div>
+                                )}
+                                {isArrival && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-foreground tabular-nums">
+                                      {formatTime(event.time)}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">Arrivée</span>
+                                  </div>
+                                )}
+                                {isStop && (
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-semibold text-destructive tabular-nums">
+                                        {formatTime(event.startTime)}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">
+                                        Arrêt · {formatDurationMs(event.duration)}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                                      jusqu'à {formatTime(event.endTime)}
+                                    </p>
+                                  </div>
+                                )}
+                              </button>
+                            </div>
+                          )
+                        })}
+
+                        <div className="mt-1 pt-2 border-t border-border/30">
+                          <span className="text-[11px] text-muted-foreground">
+                            Total : {formatDistanceKm(selectedStats.totalDistance)} · {selectedStats.stops.length} arrêt{selectedStats.stops.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 gap-3">
+                      <div className="rounded-full bg-muted/40 p-5">
+                        <Route className="h-8 w-8 text-muted-foreground/20" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Aucun déplacement enregistré
+                        </p>
+                        <p className="text-xs text-muted-foreground/60 mt-0.5">{periodLabel}</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : routeEntries.length > 0 ? (
+                <div className="p-4 space-y-3">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Résumé — {periodLabel}
+                  </h3>
+                  <div className="space-y-2">
+                    {routeEntries.map(entry => {
+                      const stats = deviceStats.get(entry.deviceId)
+                      if (!stats) return null
+                      return (
                         <div
-                          className={`h-full rounded-full ${
-                            (device.batteryLevel || 0) < 20
-                              ? 'bg-destructive'
-                              : (device.batteryLevel || 0) < 50
-                              ? 'bg-chart-5'
-                              : 'bg-chart-2'
-                          }`}
-                          style={{ width: `${device.batteryLevel || 0}%` }}
-                        />
-                      </div>
-                      <span className={`text-[10px] font-medium tabular-nums ${battColor}`}>
-                        {device.batteryLevel || 0}%
-                      </span>
-                    </div>
-
-                    <p className="text-[10px] text-muted-foreground/60 font-mono tabular-nums truncate">
-                      {Number(device.latitude).toFixed(4)}, {Number(device.longitude).toFixed(4)}
-                    </p>
+                          key={entry.safeId}
+                          className="flex items-center justify-between rounded-lg border border-border/50 bg-background/60 px-4 py-3 hover:border-border transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className="h-2.5 w-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: entry.color }}
+                            />
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold truncate leading-tight">
+                                {entry.label}
+                              </p>
+                              {stats.firstPos && stats.lastPos && (
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                  🟢 {formatTime(stats.firstPos.recordedAt)} → {formatTime(stats.lastPos.recordedAt)} · {formatDistanceKm(stats.totalDistance)}
+                                </p>
+                              )}
+                              {stats.stops.length > 0 && (
+                                <p className="text-[11px] text-muted-foreground/70">
+                                  {stats.stops.length} arrêt{stats.stops.length !== 1 ? 's' : ''} détecté{stats.stops.length !== 1 ? 's' : ''}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto px-2 py-1 text-[11px] text-primary/70 hover:text-primary hover:bg-primary/5 gap-0.5 shrink-0"
+                            onClick={() => setSelectedDeviceId(entry.deviceId)}
+                          >
+                            Voir le détail
+                            <ChevronRight className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )
+                    })}
                   </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <div className="rounded-full bg-muted/40 p-5">
+                    <Route className="h-8 w-8 text-muted-foreground/20" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Aucun déplacement enregistré
+                    </p>
+                    <p className="text-xs text-muted-foreground/60 mt-0.5">{periodLabel}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

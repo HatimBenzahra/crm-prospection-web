@@ -6,6 +6,7 @@ import {
   useKioskRenameDevice,
   useKioskDeleteDevice,
 } from '@/hooks/metier/api/kiosk'
+import { useSetDeviceCommercial } from '@/hooks/metier/api/gps-tracking'
 import DevicesTab from './components/DevicesTab'
 import DeviceDetailSheet from './components/DeviceDetailSheet'
 import DeviceCommandDialog from './components/DeviceCommandDialog'
@@ -16,6 +17,7 @@ export default function KioskDevicesPage() {
   const sendCommandMutation = useKioskSendCommand()
   const renameDeviceMutation = useKioskRenameDevice()
   const deleteDeviceMutation = useKioskDeleteDevice()
+  const setCommercialMutation = useSetDeviceCommercial()
 
   const [deviceFilters, setDeviceFilters] = useState({
     search: '',
@@ -50,6 +52,10 @@ export default function KioskDevicesPage() {
     if (window.confirm(`Supprimer la tablette ${device.deviceName || device.deviceId} ?`)) {
       deleteDeviceMutation.mutate(device.deviceId)
     }
+  }
+
+  const handleSetCommercial = ({ deviceId, commercialName }) => {
+    setCommercialMutation.mutate({ deviceId, commercialName })
   }
 
   if (devicesQuery.isLoading) {
@@ -90,6 +96,7 @@ export default function KioskDevicesPage() {
         deviceFilters={deviceFilters}
         setDeviceFilters={setDeviceFilters}
         onCommand={handleDeviceCommand}
+        onSetCommercial={handleSetCommercial}
         onRename={handleRenameDevice}
         onDelete={handleDeleteDevice}
         onSelectDevice={setSelectedDevice}

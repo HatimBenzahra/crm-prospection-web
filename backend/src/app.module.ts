@@ -19,6 +19,7 @@ import { RecordingModule } from './recording/recording.module';
 import { CreationCompteModule } from './creation_compte/creation_compte.module';
 import { GamificationModule } from './gamification/gamification.module';
 import { SearchModule } from './search/search.module';
+import { GpsTrackingModule } from './gps-tracking/gps-tracking.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { SearchModule } from './search/search.module';
     CreationCompteModule,
     GamificationModule,
     SearchModule,
+    GpsTrackingModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

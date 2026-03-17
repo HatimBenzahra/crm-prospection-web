@@ -39,6 +39,7 @@ import {
   Tablet,
   Filter,
 } from 'lucide-react'
+import useDeviceCommercialNames from '../useDeviceCommercialNames'
 
 const formatRelativeTime = value => {
   if (!value) return 'Inconnu'
@@ -96,13 +97,18 @@ export default function DevicesTab({
   deviceFilters,
   setDeviceFilters,
   onCommand,
+  onSetCommercial,
   onRename,
   onDelete,
   onSelectDevice,
 }) {
+  const { getCommercialName } = useDeviceCommercialNames()
+
   const filteredDevices = useMemo(() => {
     return (devices || []).filter(device => {
-      const matchesSearch = (device.deviceName || '')
+      const commercialName = getCommercialName(device) || ''
+      const searchText = `${device.deviceName || ''} ${device.deviceId || ''} ${commercialName}`
+      const matchesSearch = searchText
         .toLowerCase()
         .includes((deviceFilters.search || '').toLowerCase())
       const matchesOnline =
@@ -115,7 +121,7 @@ export default function DevicesTab({
         (deviceFilters.lockFilter === 'unlocked' && !device.kioskLocked)
       return matchesSearch && matchesOnline && matchesLock
     })
-  }, [devices, deviceFilters])
+  }, [devices, deviceFilters, getCommercialName])
 
   const totalCount = (devices || []).length
 
@@ -202,7 +208,8 @@ export default function DevicesTab({
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/20 hover:bg-muted/20">
-                  <TableHead className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Appareil</TableHead>
+                  <TableHead className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Nom</TableHead>
+                  <TableHead className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Commercial</TableHead>
                   <TableHead className="font-semibold text-xs uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Modèle</TableHead>
                   <TableHead className="font-semibold text-xs uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Android</TableHead>
                   <TableHead className="font-semibold text-xs uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Kiosk</TableHead>
@@ -217,6 +224,7 @@ export default function DevicesTab({
               <TableBody>
                 {filteredDevices.map(device => {
                   const batteryLevel = Number(device.batteryLevel) || 0
+                  const commercialName = getCommercialName(device)
 
                   return (
                     <TableRow
@@ -236,10 +244,24 @@ export default function DevicesTab({
                               <span className="inline-flex h-2 w-2 rounded-full bg-muted-foreground/40" />
                             )}
                           </span>
-                          <span className="font-semibold text-sm leading-tight">
-                            {device.deviceName || device.deviceId}
-                          </span>
+                          <div className="min-w-0">
+                            <span className="block font-semibold text-sm leading-tight truncate">
+                              {commercialName || device.deviceName || device.deviceId}
+                            </span>
+                            {commercialName && (
+                              <span className="block text-xs text-muted-foreground truncate">
+                                {device.deviceName || device.deviceId}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {commercialName ? (
+                          <Badge variant="outline">{commercialName}</Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Non assigné</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground hidden lg:table-cell">
                         {device.model || <span className="opacity-40">—</span>}
@@ -309,6 +331,16 @@ export default function DevicesTab({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const commercialName = window.prompt('Nom du commercial', getCommercialName(device) || '')
+                                if (commercialName === null) return
+                                onSetCommercial({ deviceId: device.deviceId, commercialName: commercialName.trim() })
+                              }}
+                            >
+                              <Pencil className="h-4 w-4 text-muted-foreground" />
+                              Assigner commercial
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => onRename(device)}>
                               <Pencil className="h-4 w-4 text-muted-foreground" />
                               Renommer

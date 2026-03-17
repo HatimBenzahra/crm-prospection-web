@@ -440,6 +440,31 @@ model RecordingSegment {
   @@index([status])
 }
 
+model GpsPosition {
+  id           Int      @id @default(autoincrement())
+  deviceId     String
+  deviceName   String?
+  latitude     Float
+  longitude    Float
+  accuracy     Float?
+  batteryLevel Int?
+  isOnline     Boolean  @default(true)
+  recordedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([deviceId])
+  @@index([recordedAt])
+  @@index([deviceId, recordedAt])
+}
+
+model DeviceMapping {
+  id             Int      @id @default(autoincrement())
+  deviceId       String   @unique
+  commercialName String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
 enum SegmentStatus {
   PENDING
   PROCESSING

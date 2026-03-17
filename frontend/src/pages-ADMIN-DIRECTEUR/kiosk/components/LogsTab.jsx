@@ -31,6 +31,7 @@ import {
   Calendar,
   AlertOctagon,
 } from 'lucide-react'
+import useDeviceCommercialNames from '../useDeviceCommercialNames'
 
 const formatRelativeTime = value => {
   if (!value) return 'Inconnu'
@@ -121,6 +122,7 @@ const getLevelConfig = level => {
 }
 
 export default function LogsTab({ logs, logTypes, loading, filters, setFilters, onClearLogs, devices }) {
+  const { getCommercialName, getDeviceLabel } = useDeviceCommercialNames()
   const rows = logs?.logs || []
   const total = logs?.total || 0
   const [expandedRows, setExpandedRows] = useState(new Set())
@@ -203,7 +205,7 @@ export default function LogsTab({ logs, logTypes, loading, filters, setFilters, 
                 <SelectItem value="all">Toutes les tablettes</SelectItem>
                 {(devices || []).map(device => (
                   <SelectItem key={device.deviceId} value={device.deviceId}>
-                    {device.deviceName || device.deviceId}
+                    {getDeviceLabel(device)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -333,6 +335,10 @@ export default function LogsTab({ logs, logTypes, loading, filters, setFilters, 
                 const TypeIcon = typeConfig.icon
                 const isExpanded = expandedRows.has(log.id)
                 const hasExtra = log.message?.length > 90 || log.data
+                const commercial = getCommercialName({
+                  serialNumber: log.deviceId,
+                  deviceId: log.deviceId,
+                })
 
                 return (
                   <React.Fragment key={log.id}>
@@ -359,9 +365,14 @@ export default function LogsTab({ logs, logTypes, loading, filters, setFilters, 
                       <TableCell className="py-3">
                         <div className="flex items-center gap-1.5">
                           <Tablet className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-                          <span className="text-xs truncate max-w-[110px]">
-                            {log.deviceName || log.deviceId || '-'}
-                          </span>
+                          <div className="min-w-0">
+                            <span className="text-xs truncate max-w-[110px] block font-semibold">
+                              {commercial || 'Non assigné'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground truncate max-w-[110px] block">
+                              {log.deviceName || log.deviceId || '-'}
+                            </span>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="py-3">

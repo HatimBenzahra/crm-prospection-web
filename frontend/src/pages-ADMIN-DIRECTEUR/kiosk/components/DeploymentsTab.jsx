@@ -28,6 +28,7 @@ import {
   User,
   Monitor,
 } from 'lucide-react'
+import useDeviceCommercialNames from '../useDeviceCommercialNames'
 
 const formatRelativeTime = value => {
   if (!value) return 'Inconnu'
@@ -105,6 +106,7 @@ export default function DeploymentsTab({
   setDeployHistoryFilters,
   devices,
 }) {
+  const { getCommercialName, getDeviceLabel } = useDeviceCommercialNames()
   const rows = versionMatrix?.matrix || []
   const historyRows = deployHistory?.entries || []
 
@@ -147,6 +149,10 @@ export default function DeploymentsTab({
                   const prowinStatus = getVersionStatusUI(entry.prowin?.status)
                   const KioskIcon = kioskStatus.icon
                   const ProwinIcon = prowinStatus.icon
+                  const commercialName = getCommercialName({
+                    serialNumber: entry.deviceId,
+                    deviceId: entry.deviceId,
+                  })
                   const isOutdated =
                     entry.kiosk?.status !== 'up_to_date' ||
                     entry.prowin?.status !== 'up_to_date'
@@ -169,6 +175,9 @@ export default function DeploymentsTab({
                           />
                           <div>
                             <p className="text-sm font-semibold leading-tight">
+                              {commercialName || 'Non assigné'}
+                            </p>
+                            <p className="text-xs leading-tight text-muted-foreground">
                               {entry.deviceName || entry.deviceId}
                             </p>
                             {entry.deviceModel && (
@@ -256,7 +265,7 @@ export default function DeploymentsTab({
                   <SelectItem value="all">Toutes les tablettes</SelectItem>
                   {(devices || []).map(device => (
                     <SelectItem key={device.deviceId} value={device.deviceId}>
-                      {device.deviceName || device.deviceId}
+                      {getDeviceLabel(device)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -303,6 +312,10 @@ export default function DeploymentsTab({
                 {historyRows.map((entry, index) => {
                   const statusUI = getHistoryStatusUI(entry.status)
                   const StatusIcon = statusUI.icon
+                  const commercialName = getCommercialName({
+                    serialNumber: entry.deviceId,
+                    deviceId: entry.deviceId,
+                  })
 
                   return (
                     <TableRow
@@ -317,9 +330,10 @@ export default function DeploymentsTab({
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm font-medium">
-                          {entry.deviceName || entry.deviceId}
-                        </span>
+                        <div>
+                          <span className="text-sm font-medium block">{commercialName || 'Non assigné'}</span>
+                          <span className="text-xs text-muted-foreground block">{entry.deviceName || entry.deviceId}</span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <span className="font-mono text-xs text-muted-foreground">
