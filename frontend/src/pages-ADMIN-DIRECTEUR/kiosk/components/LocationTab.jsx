@@ -652,7 +652,7 @@ export default function LocationTab({
       className={`flex min-h-[420px] bg-background overflow-hidden ${
         isFullscreen
           ? 'h-dvh rounded-none border-0'
-          : 'h-[calc(100dvh-240px)] rounded-xl border border-border/40'
+          : 'h-[calc(100dvh-130px)] rounded-xl border border-border/40'
       }`}
     >
       <aside className="w-[360px] shrink-0 min-h-0 border-r border-border/50 bg-card/95 backdrop-blur-sm flex flex-col">
@@ -979,7 +979,7 @@ export default function LocationTab({
           ) : selectedDeviceId ? (
             selectedStats && selectedStats.positions.length >= 2 ? (
               <>
-                <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b border-border/40 p-3 space-y-2">
+                <div className="sticky top-0 z-20 bg-card/95 backdrop-blur-sm border-b border-border/40 p-3 space-y-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -1039,7 +1039,7 @@ export default function LocationTab({
                           <button
                             type="button"
                             onClick={() => handleEventClick(event)}
-                            className={`h-5 w-5 rounded-full border-2 border-background shadow-sm flex items-center justify-center z-10 hover:scale-110 transition-transform ${
+                            className={`h-5 w-5 rounded-full border-2 border-background shadow-sm flex items-center justify-center hover:scale-110 transition-transform ${
                               isDeparture
                                 ? 'bg-chart-2'
                                 : isArrival
@@ -1563,16 +1563,37 @@ export default function LocationTab({
             )}
 
           {mode === 'trajet' && !selectedDeviceId && routeEntries.length > 0 && (
-            <div className="absolute bottom-8 left-3 z-10 pointer-events-none">
-              <div className="rounded-xl bg-background/90 backdrop-blur-sm border border-border/50 shadow-lg px-3 py-2.5 flex flex-col gap-1.5 max-h-[240px] overflow-y-auto">
+            <div className="absolute bottom-8 left-3 z-10">
+              <div className="rounded-xl bg-background/90 backdrop-blur-sm border border-border/50 shadow-lg px-1.5 py-1.5 flex flex-col gap-0.5 max-h-[240px] overflow-y-auto">
                 {routeEntries.map(entry => (
-                  <div key={entry.safeId} className="flex items-center gap-2">
+                  <button
+                    key={entry.safeId}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDeviceId(entry.deviceId)
+                      const positions = routePositionsByDevice?.get(entry.deviceId) || []
+                      if (positions.length && mapRef.current) {
+                        const bounds = new mapboxgl.LngLatBounds()
+                        for (const p of positions) bounds.extend([p.longitude, p.latitude])
+                        try {
+                          mapRef.current.fitBounds(bounds, {
+                            padding: 60,
+                            maxZoom: 16,
+                            duration: 800,
+                          })
+                        } catch (e) {
+                          void e
+                        }
+                      }
+                    }}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/60 transition-colors cursor-pointer text-left"
+                  >
                     <div
                       className="h-2.5 w-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: entry.color }}
                     />
                     <span className="text-[11px] font-medium text-foreground">{entry.label}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>

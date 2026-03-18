@@ -178,14 +178,7 @@ export default function KioskLocationPage() {
   }
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col gap-6 p-6">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Localisation</h1>
-        <p className="text-base leading-relaxed text-muted-foreground">
-          Suivi en temps réel et trajets des commerciaux
-        </p>
-      </div>
-
+    <div className="flex flex-1 min-h-0 flex-col p-3">
       <div className="flex-1 min-h-0">
         <LocationTab
           devices={devicesQuery.data || []}
