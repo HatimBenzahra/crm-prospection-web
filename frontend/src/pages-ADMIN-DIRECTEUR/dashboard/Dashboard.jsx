@@ -569,7 +569,7 @@ export default function Dashboard() {
         className="grid grid-cols-1 lg:grid-cols-5 gap-6 dash-stagger"
         style={{ animationDelay: '160ms' }}
       >
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 flex">
           <FleetTerrainWidget />
         </div>
 
