@@ -20,8 +20,10 @@ import {
   Terminal,
   Cpu,
   Radio,
+  KeyRound,
 } from 'lucide-react'
 import useDeviceCommercialNames from '../useDeviceCommercialNames'
+import DeviceCommandDialog from './DeviceCommandDialog'
 
 const formatDateTime = value => {
   if (!value) return 'Inconnu'
@@ -67,10 +69,16 @@ const batteryTextColor = level => {
 }
 
 const SectionCard = ({ icon: Icon, title, borderColor = 'border-primary', children }) => (
-  <div className={`rounded-xl border border-border/60 bg-card overflow-hidden shadow-[0_1px_3px_0_rgb(0_0_0/_0.04)]`}>
-    <div className={`flex items-center gap-2.5 px-4 py-3 border-b border-border/40 border-l-2 ${borderColor}`}>
+  <div
+    className={`rounded-xl border border-border/60 bg-card overflow-hidden shadow-[0_1px_3px_0_rgb(0_0_0/_0.04)]`}
+  >
+    <div
+      className={`flex items-center gap-2.5 px-4 py-3 border-b border-border/40 border-l-2 ${borderColor}`}
+    >
       {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
-      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </span>
     </div>
     <div className="p-4">{children}</div>
   </div>
@@ -96,9 +104,7 @@ const VersionPill = ({ label, value, code }) => (
       ) : (
         <span className="text-muted-foreground/40 text-xs">—</span>
       )}
-      {code && (
-        <span className="text-xs text-muted-foreground/60 font-mono">#{code}</span>
-      )}
+      {code && <span className="text-xs text-muted-foreground/60 font-mono">#{code}</span>}
     </div>
   </div>
 )
@@ -139,6 +145,8 @@ const CopyButton = ({ value }) => {
 
 export default function DeviceDetailSheet({ device, open, onClose, onCommand, onRename }) {
   const { getCommercialName } = useDeviceCommercialNames()
+  const [commandDialogOpen, setCommandDialogOpen] = useState(false)
+  const [commandPending, setCommandPending] = useState(false)
   const batteryLevel = Number(device?.batteryLevel) || 0
   const batteryWidth = Math.min(100, Math.max(0, batteryLevel))
   const pendingCount = device?.pendingCommands?.length || 0
@@ -200,7 +208,9 @@ export default function DeviceDetailSheet({ device, open, onClose, onCommand, on
                       <Zap className="h-3.5 w-3.5 text-chart-5 animate-pulse" />
                     )}
                     <Battery className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className={`text-sm font-bold tabular-nums ${batteryTextColor(batteryLevel)}`}>
+                    <span
+                      className={`text-sm font-bold tabular-nums ${batteryTextColor(batteryLevel)}`}
+                    >
                       {batteryLevel}%
                     </span>
                   </div>
@@ -234,8 +244,16 @@ export default function DeviceDetailSheet({ device, open, onClose, onCommand, on
 
             <SectionCard icon={Cpu} title="Logiciel" borderColor="border-l-chart-2">
               <VersionPill label="Android" value={device.androidVersion} />
-              <VersionPill label="Kiosk" value={device.kioskVersion} code={device.kioskVersionCode} />
-              <VersionPill label="ProWin" value={device.prowinVersion} code={device.prowinVersionCode} />
+              <VersionPill
+                label="Kiosk"
+                value={device.kioskVersion}
+                code={device.kioskVersionCode}
+              />
+              <VersionPill
+                label="ProWin"
+                value={device.prowinVersion}
+                code={device.prowinVersionCode}
+              />
             </SectionCard>
 
             <SectionCard icon={Radio} title="Réseau" borderColor="border-l-blue-500">
@@ -245,7 +263,9 @@ export default function DeviceDetailSheet({ device, open, onClose, onCommand, on
                   <div className="flex items-center gap-2">
                     <SignalBars strength={device.signalStrength} />
                     {device.signalStrength != null && (
-                      <span className="text-xs font-medium tabular-nums">{device.signalStrength}%</span>
+                      <span className="text-xs font-medium tabular-nums">
+                        {device.signalStrength}%
+                      </span>
                     )}
                   </div>
                 </div>
@@ -307,7 +327,7 @@ export default function DeviceDetailSheet({ device, open, onClose, onCommand, on
                       onClick={() =>
                         window.open(
                           `https://www.google.com/maps?q=${device.latitude},${device.longitude}`,
-                          '_blank',
+                          '_blank'
                         )
                       }
                       className="flex items-center gap-1.5 text-xs text-primary hover:underline"
@@ -357,7 +377,11 @@ export default function DeviceDetailSheet({ device, open, onClose, onCommand, on
               <Button
                 size="sm"
                 variant={device.kioskLocked ? 'outline' : 'destructive'}
-                className={device.kioskLocked ? 'border-chart-2/40 text-chart-2 hover:bg-chart-2/10 hover:text-chart-2' : ''}
+                className={
+                  device.kioskLocked
+                    ? 'border-chart-2/40 text-chart-2 hover:bg-chart-2/10 hover:text-chart-2'
+                    : ''
+                }
                 onClick={() =>
                   onCommand({
                     deviceId: device.deviceId,
@@ -383,6 +407,15 @@ export default function DeviceDetailSheet({ device, open, onClose, onCommand, on
               <Button size="sm" variant="outline" onClick={() => onRename(device)}>
                 Renommer
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-purple-500/30 text-purple-600 hover:bg-purple-500/10 hover:text-purple-600 dark:text-purple-400 dark:hover:text-purple-400"
+                onClick={() => setCommandDialogOpen(true)}
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                Commandes
+              </Button>
               <div className="ml-auto">
                 <Button size="sm" variant="ghost" onClick={onClose}>
                   <X className="h-3.5 w-3.5" />
@@ -392,6 +425,22 @@ export default function DeviceDetailSheet({ device, open, onClose, onCommand, on
             </div>
           </div>
         )}
+
+        <DeviceCommandDialog
+          open={commandDialogOpen}
+          onClose={() => setCommandDialogOpen(false)}
+          device={device}
+          isPending={commandPending}
+          onSend={async cmd => {
+            setCommandPending(true)
+            try {
+              await onCommand(cmd)
+            } finally {
+              setCommandPending(false)
+            }
+            setCommandDialogOpen(false)
+          }}
+        />
       </SheetContent>
     </Sheet>
   )

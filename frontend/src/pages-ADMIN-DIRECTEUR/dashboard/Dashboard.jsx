@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import ActiveZonesSlider_Dashboard from '@/components/ActiveZonesSlider_Dashboard'
 import { Pagination } from '@/components/Pagination'
 import { Button } from '@/components/ui/button'
@@ -23,8 +22,6 @@ import {
   Calendar,
   ArrowRight,
   DoorOpen,
-  Mic,
-  Play,
   Loader2,
   Star,
   FileText,
@@ -32,6 +29,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { useDashboardLogic } from './useDashboardLogic'
 import PorteDetailModal from './PorteDetailModal'
+import FleetTerrainWidget from './FleetTerrainWidget'
 
 function AnimatedNumber({ value, duration = 800 }) {
   const [display, setDisplay] = React.useState(0)
@@ -367,14 +365,6 @@ function TopOffresCard({
   )
 }
 
-const SEGMENT_FILTERS = [
-  { key: 'ARGUMENTE', label: 'Argumenté' },
-  { key: 'REFUS', label: 'Refus' },
-  { key: 'CONTRAT_SIGNE', label: 'Contrats' },
-  { key: 'RENDEZ_VOUS_PRIS', label: 'RDV' },
-  { key: 'TOUS', label: 'Tous' },
-]
-
 const KPI_COLORS = {
   emerald: {
     iconBg: 'bg-emerald-100 dark:bg-emerald-900/30',
@@ -433,74 +423,7 @@ function KpiCard({ title, value, description, icon: Icon, trend, color = 'blue' 
   )
 }
 
-function SegmentRow({ segment, onClick, onImmeubleClick }) {
-  const dur = `${Math.floor(segment.durationSec / 60)}:${String(Math.floor(segment.durationSec % 60)).padStart(2, '0')}`
-  const score = segment.speechScore
-  const time = segment.createdAt
-    ? new Date(segment.createdAt).toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : '—'
-  return (
-    <tr
-      onClick={onClick}
-      className="hover:bg-muted/30 cursor-pointer transition-colors group even:bg-muted/10"
-    >
-      <td className="px-4 py-3">
-        <div className="text-[13px] font-medium">Porte {segment.porteNumero}</div>
-        <button
-          type="button"
-          onClick={e => {
-            e.stopPropagation()
-            onImmeubleClick()
-          }}
-          className="text-[11px] text-primary/70 hover:text-primary hover:underline mt-0.5 text-left"
-        >
-          {segment.immeubleAdresse}
-        </button>
-      </td>
-      <td className="px-4 py-3 text-[12px] text-muted-foreground">
-        {segment.commercialNom || '—'}
-      </td>
-      <td className="px-4 py-3">
-        {segment.statut && (
-          <Badge variant="outline" className={`text-[10px] ${getStatusColor(segment.statut)}`}>
-            {getStatusLabel(segment.statut)}
-          </Badge>
-        )}
-      </td>
-      <td className="px-4 py-3">
-        {score != null ? (
-          <div className="flex items-center gap-2">
-            <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-              <div
-                className={`h-full rounded-full ${score >= 70 ? 'bg-emerald-500' : score >= 40 ? 'bg-amber-500' : 'bg-red-500'}`}
-                style={{ width: `${Math.min(score, 100)}%` }}
-              />
-            </div>
-            <span
-              className={`text-[12px] font-semibold tabular-nums ${score >= 70 ? 'text-emerald-500' : score >= 40 ? 'text-amber-500' : 'text-red-500'}`}
-            >
-              {score}%
-            </span>
-          </div>
-        ) : (
-          <span className="text-[11px] text-muted-foreground/40">—</span>
-        )}
-      </td>
-      <td className="px-4 py-3 text-[12px] text-muted-foreground tabular-nums">{time}</td>
-      <td className="px-4 py-3 text-[12px] text-muted-foreground tabular-nums">{dur}</td>
-      <td className="px-4 py-3">
-        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/20 group-hover:text-primary transition-colors" />
-      </td>
-    </tr>
-  )
-}
-
 export default function Dashboard() {
-  const navigate = useNavigate()
-
   const {
     today,
     totals,
@@ -511,10 +434,6 @@ export default function Dashboard() {
     selectedPorteId,
     setSelectedPorteId,
     isLoading,
-    segments,
-    segmentsLoading,
-    segmentFilter,
-    setSegmentFilter,
     perfMode,
     setPerfMode,
     top3,
@@ -650,80 +569,9 @@ export default function Dashboard() {
         className="grid grid-cols-1 lg:grid-cols-5 gap-6 dash-stagger"
         style={{ animationDelay: '160ms' }}
       >
-        <Card className="lg:col-span-3">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Mic className="h-5 w-5 text-primary" />
-                <CardTitle>Enregistrements du jour</CardTitle>
-              </div>
-              <Badge variant="secondary" className="text-xs">
-                {segments.length} segment{segments.length > 1 ? 's' : ''}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-1.5 pt-2 overflow-x-auto scrollbar-none">
-              {SEGMENT_FILTERS.map(filter => (
-                <button
-                  type="button"
-                  key={filter.key ?? 'all'}
-                  onClick={() => setSegmentFilter(filter.key)}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all shrink-0 active:scale-95 ${
-                    segmentFilter === filter.key
-                      ? 'bg-primary/10 text-primary border-primary/20'
-                      : 'text-muted-foreground/60 border-transparent hover:bg-muted/40 hover:text-muted-foreground'
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {segmentsLoading && (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            )}
-            {!segmentsLoading && segments.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-10 text-center px-4">
-                <Mic className="h-8 w-8 text-muted-foreground/30 mb-3" />
-                <p className="text-sm text-muted-foreground">Aucun enregistrement aujourd'hui</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">
-                  Les segments apparaîtront quand les commerciaux prospecteront
-                </p>
-              </div>
-            )}
-            {!segmentsLoading && segments.length > 0 && (
-              <div className="max-h-[420px] overflow-y-auto overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted/50 backdrop-blur-sm sticky top-0">
-                    <tr className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                      <th className="px-4 py-2 text-left">Porte</th>
-                      <th className="px-4 py-2 text-left">Commercial</th>
-                      <th className="px-4 py-2 text-left">Statut</th>
-                      <th className="px-4 py-2 text-left">Parole</th>
-                      <th className="px-4 py-2 text-left">Heure</th>
-                      <th className="px-4 py-2 text-left">Durée</th>
-                      <th className="px-4 py-2 w-8"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/30">
-                    {segments.map(seg => (
-                      <SegmentRow
-                        key={seg.id}
-                        segment={seg}
-                        onClick={() =>
-                          navigate(`/immeubles/${seg.immeubleId}/portes/${seg.porteId}`)
-                        }
-                        onImmeubleClick={() => navigate(`/immeubles/${seg.immeubleId}`)}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-3">
+          <FleetTerrainWidget />
+        </div>
 
         <div className="lg:col-span-2 flex flex-col gap-6">
           {rdvToday && rdvToday.length > 0 && (

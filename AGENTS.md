@@ -8,9 +8,15 @@
 
 Before starting ANY work on this project, load context from the Obsidian vault using the `mcp_obsidian_read_note` tool.
 
-**Start here:**
+**Start here — Product Playbook (MANDATORY):**
 ```
-mcp_obsidian_read_note(path="Prospection/Prospection Overview.md")
+mcp_obsidian_read_note(path="CRM_PROSPECTION/Prospection/Product Playbook.md")
+```
+This is the business context brain. It explains WHY each feature exists, the personas, the daily workflows, the inviolable business rules, and the target state. Read this FIRST before touching any code.
+
+**Then for technical details, read the Overview:**
+```
+mcp_obsidian_read_note(path="CRM_PROSPECTION/Prospection/Prospection Overview.md")
 ```
 
 **Then read the relevant module notes based on your task:**
