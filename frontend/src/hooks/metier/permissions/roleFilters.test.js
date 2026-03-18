@@ -55,6 +55,7 @@ describe('ROLES and PERMISSIONS constants', () => {
         'ecoutes',
         'gestion',
         'gamification',
+        'kiosk',
       ].sort()
     )
   })
