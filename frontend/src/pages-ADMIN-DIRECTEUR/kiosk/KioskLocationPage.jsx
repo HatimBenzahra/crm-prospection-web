@@ -93,7 +93,10 @@ export default function KioskLocationPage() {
   }, [periodKey, customFrom, customTo, customFromTime, customToTime])
 
   const selectedDevice = useMemo(
-    () => (devicesQuery.data || []).find(d => d.deviceId === selectedDeviceId) || null,
+    () =>
+      (devicesQuery.data || []).find(
+        d => d.deviceId === selectedDeviceId || d.serialNumber === selectedDeviceId
+      ) || null,
     [devicesQuery.data, selectedDeviceId]
   )
 

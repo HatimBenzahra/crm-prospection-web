@@ -392,10 +392,31 @@ export default function LocationTab({
     return stats
   }, [routePositionsByDevice])
 
-  const selectedStats = useMemo(() => {
+  // Resolve selectedDeviceId to the actual key used in routePositionsByDevice
+  // (chips use kiosk deviceId but GPS positions may use serialNumber)
+  const resolvedRouteDeviceId = useMemo(() => {
     if (!selectedDeviceId) return null
-    return deviceStats.get(selectedDeviceId) || null
-  }, [selectedDeviceId, deviceStats])
+    if (routePositionsByDevice.has(selectedDeviceId)) return selectedDeviceId
+    const filterDevice = (allDevicesForFilter || []).find(
+      d => d.deviceId === selectedDeviceId || d.serialNumber === selectedDeviceId
+    )
+    if (filterDevice) {
+      if (routePositionsByDevice.has(filterDevice.serialNumber)) return filterDevice.serialNumber
+      if (routePositionsByDevice.has(filterDevice.deviceId)) return filterDevice.deviceId
+    }
+    const matchEntry = routeEntries.find(e => {
+      const fd = (allDevicesForFilter || []).find(
+        d => d.deviceId === e.deviceId || d.serialNumber === e.deviceId
+      )
+      return fd && (fd.deviceId === selectedDeviceId || fd.serialNumber === selectedDeviceId)
+    })
+    return matchEntry?.deviceId || selectedDeviceId
+  }, [selectedDeviceId, routePositionsByDevice, allDevicesForFilter, routeEntries])
+
+  const selectedStats = useMemo(() => {
+    if (!resolvedRouteDeviceId) return null
+    return deviceStats.get(resolvedRouteDeviceId) || null
+  }, [resolvedRouteDeviceId, deviceStats])
 
   const selectedEnrichedEvents = useMemo(() => {
     if (!selectedStats || selectedStats.positions.length < 2) return []
@@ -405,9 +426,9 @@ export default function LocationTab({
   const selectedStopEvents = useMemo(() => selectedStats?.stops || [], [selectedStats])
 
   const visibleRouteEntry = useMemo(() => {
-    if (!selectedDeviceId) return null
-    return routeEntries.find(e => e.deviceId === selectedDeviceId) || null
-  }, [selectedDeviceId, routeEntries])
+    if (!resolvedRouteDeviceId) return null
+    return routeEntries.find(e => e.deviceId === resolvedRouteDeviceId) || null
+  }, [resolvedRouteDeviceId, routeEntries])
 
   const entriesToDraw = useMemo(() => {
     if (selectedDeviceId) return visibleRouteEntry ? [visibleRouteEntry] : []
@@ -437,8 +458,8 @@ export default function LocationTab({
 
   useEffect(() => {
     if (mode !== 'trajet' || !mapRef.current || !routePositionsByDevice) return
-    const positions = selectedDeviceId
-      ? routePositionsByDevice.get(selectedDeviceId) || []
+    const positions = resolvedRouteDeviceId
+      ? routePositionsByDevice.get(resolvedRouteDeviceId) || []
       : Array.from(routePositionsByDevice.values()).flat()
     if (!positions.length) return
     const bounds = new mapboxgl.LngLatBounds()
@@ -450,7 +471,7 @@ export default function LocationTab({
     } catch (error) {
       void error
     }
-  }, [mode, routePositionsByDevice, selectedDeviceId])
+  }, [mode, routePositionsByDevice, resolvedRouteDeviceId])
 
   const setupMapExtras = useCallback(() => {
     const map = mapRef.current?.getMap()
