@@ -1,21 +1,14 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 
-/**
- * Composant qui scroll automatiquement vers le haut lors des changements de route
- * Utilisé globalement dans l'application pour améliorer l'UX
- */
 export default function ScrollToTop() {
   const { pathname } = useLocation()
 
   useEffect(() => {
-    // Scroll vers le haut de manière fluide à chaque changement de route
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: 'smooth',
-    })
+    window.scrollTo(0, 0)
+    const mainEl = document.querySelector('[data-slot="sidebar-inset"]')
+    if (mainEl) mainEl.scrollTop = 0
   }, [pathname])
 
-  return null // Ce composant ne rend rien visuellement
+  return null
 }
