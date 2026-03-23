@@ -1,0 +1,127 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1774275370598,
+  "projectRoot": "/Users/hatimbenzahra/Desktop/PRO_WIN/prowin/prod/app-web",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "backend": {
+      "path": "backend",
+      "purpose": null,
+      "fileCount": 10,
+      "lastAccessed": 1774275370567,
+      "keyFiles": [
+        "eslint.config.mjs",
+        "nest-cli.json",
+        "package-lock.json",
+        "package.json",
+        "tsconfig.build.json"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 0,
+      "lastAccessed": 1774275370567,
+      "keyFiles": []
+    },
+    "frontend": {
+      "path": "frontend",
+      "purpose": null,
+      "fileCount": 14,
+      "lastAccessed": 1774275370575,
+      "keyFiles": [
+        "components.json",
+        "eslint.config.js",
+        "index.html",
+        "jsconfig.json",
+        "package-lock.json"
+      ]
+    },
+    "backend/dist": {
+      "path": "backend/dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 1,
+      "lastAccessed": 1774275370576,
+      "keyFiles": [
+        "tsconfig.build.tsbuildinfo"
+      ]
+    },
+    "backend/node_modules": {
+      "path": "backend/node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1774275370579,
+      "keyFiles": []
+    },
+    "frontend/dist": {
+      "path": "frontend/dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 2,
+      "lastAccessed": 1774275370580,
+      "keyFiles": [
+        "favicon.svg",
+        "index.html"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "backend/src/recording/recording.service.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774276039213,
+      "type": "file"
+    },
+    {
+      "path": "backend/src/recording/recording.resolver.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774276016713,
+      "type": "file"
+    },
+    {
+      "path": "backend/prisma/schema.prisma",
+      "accessCount": 1,
+      "lastAccessed": 1774275998920,
+      "type": "directory"
+    }
+  ],
+  "userDirectives": []
+}
