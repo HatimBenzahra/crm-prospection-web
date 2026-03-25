@@ -73,15 +73,15 @@ export function useDashboardLogic() {
   const { data: portesModifiedToday, loading: loadingPortesModified } = usePortesModifiedToday()
   const { data: rdvToday, loading: loadingRdvToday } = usePortesRdvToday()
 
-  const fetchSegments = useCallback(async statut => {
-    setSegmentsLoading(true)
+  const fetchSegments = useCallback(async (statut, { silent = false } = {}) => {
+    if (!silent) setSegmentsLoading(true)
     try {
       const response = await gql(GET_SEGMENTS_TODAY, { statut, limit: 15 })
       setSegments(response.recordingSegmentsToday || [])
     } catch {
       setSegments([])
     } finally {
-      setSegmentsLoading(false)
+      if (!silent) setSegmentsLoading(false)
     }
   }, [])
 
@@ -89,6 +89,15 @@ export function useDashboardLogic() {
     sessionStorage.setItem('dashboard-segment-filter', segmentFilter || '')
     fetchSegments(segmentFilter === 'TOUS' ? null : segmentFilter)
   }, [segmentFilter, fetchSegments])
+
+  // Poll toutes les 5s tant qu'il y a des segments PENDING/PROCESSING
+  useEffect(() => {
+    const hasPending = segments.some(s => s.status === 'PENDING' || s.status === 'PROCESSING')
+    if (!hasPending) return
+    const statut = segmentFilter === 'TOUS' ? null : segmentFilter
+    const interval = setInterval(() => fetchSegments(statut, { silent: true }), 5000)
+    return () => clearInterval(interval)
+  }, [segments, segmentFilter, fetchSegments])
 
   const today = useMemo(() => {
     const d = new Date()
@@ -99,7 +108,16 @@ export function useDashboardLogic() {
   // Calcul des stats à partir des portes modifiées aujourd'hui
   const totals = useMemo(() => {
     if (!portesModifiedToday)
-      return { contrats: 0, rdv: 0, refus: 0, absents: 0, argumentes: 0, repassages: 0, portes: 0, immeubles: 0 }
+      return {
+        contrats: 0,
+        rdv: 0,
+        refus: 0,
+        absents: 0,
+        argumentes: 0,
+        repassages: 0,
+        portes: 0,
+        immeubles: 0,
+      }
 
     const stats = {
       contrats: 0,

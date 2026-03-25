@@ -244,27 +244,39 @@ export function useRecordingSegmentsByPorte(porteId: number | null): UseApiState
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async ({ silent = false } = {}) => {
     if (!porteId) {
       setData([])
       setLoading(false)
       return
     }
-    setLoading(true)
-    setError(null)
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const result = await api.portes.getRecordingSegments(porteId)
       setData(result)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur chargement segments')
+      if (!silent) setError(err instanceof Error ? err.message : 'Erreur chargement segments')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [porteId])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  // Poll toutes les 5s tant qu'il y a des segments PENDING ou PROCESSING
+  useEffect(() => {
+    const hasPending = data.some(
+      (s: any) => s.status === 'PENDING' || s.status === 'PROCESSING'
+    )
+    if (!hasPending) return
+    const interval = setInterval(() => fetchData({ silent: true }), 5000)
+    return () => clearInterval(interval)
+  }, [data, fetchData])
 
   return { data, loading, error, refetch: fetchData }
 }
