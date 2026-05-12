@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1774275370598,
+  "lastScanned": 1777536402594,
   "projectRoot": "/Users/hatimbenzahra/Desktop/PRO_WIN/prowin/prod/app-web",
   "techStack": {
     "languages": [
@@ -47,7 +47,7 @@
       "path": "backend",
       "purpose": null,
       "fileCount": 10,
-      "lastAccessed": 1774275370567,
+      "lastAccessed": 1777536402569,
       "keyFiles": [
         "eslint.config.mjs",
         "nest-cli.json",
@@ -60,14 +60,14 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1774275370567,
+      "lastAccessed": 1777536402569,
       "keyFiles": []
     },
     "frontend": {
       "path": "frontend",
       "purpose": null,
       "fileCount": 14,
-      "lastAccessed": 1774275370575,
+      "lastAccessed": 1777536402576,
       "keyFiles": [
         "components.json",
         "eslint.config.js",
@@ -79,24 +79,25 @@
     "backend/dist": {
       "path": "backend/dist",
       "purpose": "Distribution/build output",
-      "fileCount": 1,
-      "lastAccessed": 1774275370576,
+      "fileCount": 2,
+      "lastAccessed": 1777536402578,
       "keyFiles": [
-        "tsconfig.build.tsbuildinfo"
+        "tsconfig.build.tsbuildinfo",
+        "tsconfig.tsbuildinfo"
       ]
     },
     "backend/node_modules": {
       "path": "backend/node_modules",
       "purpose": "Dependencies",
       "fileCount": 1,
-      "lastAccessed": 1774275370579,
+      "lastAccessed": 1777536402579,
       "keyFiles": []
     },
     "frontend/dist": {
       "path": "frontend/dist",
       "purpose": "Distribution/build output",
       "fileCount": 2,
-      "lastAccessed": 1774275370580,
+      "lastAccessed": 1777536402579,
       "keyFiles": [
         "favicon.svg",
         "index.html"
@@ -105,22 +106,40 @@
   },
   "hotPaths": [
     {
-      "path": "backend/src/recording/recording.service.ts",
-      "accessCount": 3,
-      "lastAccessed": 1774276039213,
+      "path": "backend/src/commercial/commercial.service.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777536514449,
       "type": "file"
     },
     {
-      "path": "backend/src/recording/recording.resolver.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774276016713,
+      "path": "backend/src/creation_compte/creation_compte.service.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777536520162,
       "type": "file"
     },
     {
       "path": "backend/prisma/schema.prisma",
       "accessCount": 1,
-      "lastAccessed": 1774275998920,
-      "type": "directory"
+      "lastAccessed": 1777536538353,
+      "type": "file"
+    },
+    {
+      "path": "backend/src/creation_compte/creation_compte.resolver.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777536714423,
+      "type": "file"
+    },
+    {
+      "path": "backend/src/creation_compte/creation_compte.dto.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777536715286,
+      "type": "file"
+    },
+    {
+      "path": "backend/src/creation_compte/creation_compte.guard.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777536715748,
+      "type": "file"
     }
   ],
   "userDirectives": []
